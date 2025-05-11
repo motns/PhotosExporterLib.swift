@@ -1,0 +1,336 @@
+import Foundation
+import Logging
+import GRDB
+
+/*
+Used to access our local DB containing a copy of information from the Photos DB
+*/
+actor ExporterDB {
+  private let dbQueue: DatabaseQueue
+  private let logger: ClassLogger
+  private let timeProvider: TimeProvider
+
+  init(
+    exportDBPath: String,
+    logger: Logger,
+    timeProvider: TimeProvider
+  ) async throws {
+    self.logger = ClassLogger(logger: logger, className: "ExporterDB")
+    self.timeProvider = timeProvider
+
+    do {
+      self.logger.debug("Connecting to Export DB...")
+      dbQueue = try DatabaseQueue(path: exportDBPath)
+      self.logger.debug("Connected to Export DB")
+    } catch {
+      self.logger.critical("Failed to connect to ExporterDB")
+      throw ExporterDBError.connectionFailed("\(error)")
+    }
+
+    do {
+      self.logger.debug("Initialising Migrations...")
+      let migrations = try await Migrations(dbQueue: dbQueue, logger: logger)
+      try await migrations.runMigrations()
+    } catch {
+      self.logger.critical("Failed to migrate ExporterDB", [
+        "error": "\(error)"
+      ])
+      throw ExporterDBError.migrationFailed("\(error)")
+    }
+  }
+
+  func getAsset(id: String) throws -> ExportedAsset? {
+    logger.debug("Retrieving Asset with ID", [
+      "asset_id": "\(id)"
+    ])
+
+    return try dbQueue.read { db in
+      try ExportedAsset.fetchOne(db, id: id)
+    }
+  }
+
+  func getFile(assetId: String, fileType: FileType, originalFileName: String) throws -> ExportedFile? {
+    logger.debug("Retrieving File", [
+      "asset_id": "\(assetId)",
+      "file_type_id": "\(fileType)",
+      "original_file_name": "\(originalFileName)",
+    ])
+
+    return try dbQueue.read { db in
+      try ExportedFile.fetchOne(db, key: [
+        ExportedFile.Col.assetId.name: assetId,
+        ExportedFile.Col.fileType.name: fileType.rawValue,
+        ExportedFile.Col.originalFileName.name: originalFileName,
+      ])
+    }
+  }
+
+  func getFolder(id: String) throws -> ExportedFolder? {
+    logger.debug("Retrieving Folder", [
+      "id": "\(id)"
+    ])
+
+    return try dbQueue.read { db in
+      try ExportedFolder.fetchOne(db, id: id)
+    }
+  }
+
+  func getFoldersWithParent(parentId: String) throws -> [ExportedFolder] {
+    logger.debug("Retrieving Folders with given Parent", [
+      "parent_id": "\(parentId)"
+    ])
+
+    return try dbQueue.read { db in
+      try ExportedFolder.filter(
+        sql: "parent_id = ?",
+        arguments: [parentId]
+      ).fetchAll(db)
+    }
+  }
+
+  func getAlbum(id: String) throws -> ExportedAlbum? {
+    logger.debug("Retrieving Album", [
+      "id": "\(id)"
+    ])
+
+    return try dbQueue.read { db in
+      try ExportedAlbum.fetchOne(db, id: id)
+    }
+  }
+
+  func getAlbumsInFolder(folderId: String) throws -> [ExportedAlbum] {
+    logger.debug("Retrieving Albums in given Folder", [
+      "folder_id": "\(folderId)"
+    ])
+
+    return try dbQueue.read { db in
+      try ExportedAlbum.filter(
+        sql: "album_folder_id = ?",
+        arguments: [folderId]
+      ).fetchAll(db)
+    }
+  }
+
+  func getFilesToCopy() throws -> [ExportedFile] {
+    logger.debug("Getting Files to copy...")
+
+    return try dbQueue.read { db in
+      try ExportedFile
+        .filter(
+          ExportedFile.Col.wasCopied == false
+          && ExportedFile.Col.isDeleted == false
+        )
+        .fetchAll(db)
+    }
+  }
+
+  func getFilesForAlbum(albumId: String) throws -> [ExportedFile] {
+    logger.debug("Getting Files for Album...", [
+      "album_id": "\(albumId)"
+    ])
+
+    return try dbQueue.read { db in
+      try ExportedFile.filter(
+        sql: """
+        asset_id IN(
+          SELECT value
+          FROM album
+            JOIN json_each(album.asset_ids)
+          WHERE album.id = ?
+        )
+        """,
+        arguments: [albumId]
+      ).fetchAll(db)
+    }
+  }
+
+  func upsertAsset(asset: ExportedAsset) async throws -> UpsertResult {
+    let loggerMetadata: Logger.Metadata = [
+      "asset_id": "\(asset.id)"
+    ]
+    logger.debug("Upserting Asset...", loggerMetadata)
+
+    let now = await timeProvider.getDate()
+    return try await dbQueue.write { db in
+      if let curr = try ExportedAsset.fetchOne(db, id: asset.id) {
+        guard curr.needsUpdate(asset) else {
+          self.logger.trace("Asset hasn't changed - skipping", loggerMetadata)
+          return UpsertResult.nochange
+        }
+
+        self.logger.trace("Asset changed - updating...", loggerMetadata)
+        try curr.updated(from: asset, now: now).update(db)
+
+        self.logger.trace("Asset updated", [
+          "asset_id": "\(asset.id)",
+          "is_favourite": "\(asset.isFavourite)",
+          "geo_lat": "\(String(describing: asset.geoLat))",
+          "geo_long": "\(String(describing: asset.geoLong))",
+          "city_id": "\(String(describing: asset.cityId))",
+          "country_id": "\(String(describing: asset.countryId))",
+        ])
+
+        return UpsertResult.update
+      } else {
+        try asset.insert(db)
+        self.logger.trace("New Asset inserted", loggerMetadata)
+        return UpsertResult.insert
+      }
+    }
+  }
+
+  func upsertFile(file: ExportedFile) throws -> UpsertResult {
+    let loggerMetadata: Logger.Metadata = [
+      "asset_id": "\(file.assetId)",
+      "file_type": "\(file.fileType)",
+      "original_file_name": "\(file.originalFileName)"
+    ]
+    logger.debug("Upserting File...", loggerMetadata)
+
+    return try dbQueue.write { db in
+      let currOpt = try ExportedFile.fetchOne(db, key: [
+        ExportedFile.Col.assetId.name: file.assetId,
+        ExportedFile.Col.fileType.name: file.fileType.rawValue, // TODO - autoconvert?
+        ExportedFile.Col.originalFileName.name: file.originalFileName,
+      ])
+
+      if let curr = currOpt {
+        logger.trace("File already exists in DB - checking for changes...", loggerMetadata)
+
+        guard curr.needsUpdate(file) else {
+          logger.trace("File hasn't changed - skipping", loggerMetadata)
+          return UpsertResult.nochange
+        }
+
+        logger.trace("File changed - updating...", loggerMetadata)
+        try curr.updated(file).update(db)
+
+        logger.trace("File updated", [
+          "asset_id": "\(file.assetId)",
+          "file_type": "\(file.fileType)",
+          "original_file_name": "\(file.originalFileName)",
+          "imported_file_dir": "\(file.importedFileDir)",
+          "imported_file_name": "\(file.importedFileName)",
+          "was_copied": "\(file.wasCopied)",
+          "isDeleted": "\(file.isDeleted)",
+          "deletedAt": "\(String(describing: file.deletedAt))"
+        ])
+
+        return UpsertResult.update
+      } else {
+        try file.insert(db)
+        logger.trace("New File inserted", loggerMetadata)
+        return UpsertResult.insert
+      }
+    }
+  }
+
+  func upsertFolder(folder: ExportedFolder) throws -> UpsertResult {
+    let loggerMetadata: Logger.Metadata = [
+      "id": "\(folder.id)"
+    ]
+    logger.debug("Upserting Folder...", loggerMetadata)
+
+    return try dbQueue.write { db in
+      if let curr = try ExportedFolder.fetchOne(db, id: folder.id) {
+        logger.trace("Folder already exists in DB - checking for changes...", loggerMetadata)
+
+        guard curr.needsUpdate(folder) else {
+          logger.trace("Folder hasn't changed - skipping", loggerMetadata)
+          return UpsertResult.nochange
+        }
+
+        logger.trace("Folder changed - updating...", loggerMetadata)
+        try curr.updated(folder).update(db)
+
+        logger.trace("Folder updated", [
+          "folder_id": "\(folder.id)",
+          "folder_name": "\(folder.name)",
+          "parent_id": "\(String(describing: folder.parentId))"
+        ])
+        return UpsertResult.update
+      } else {
+        try folder.insert(db)
+        logger.trace("New Folder inserted", loggerMetadata)
+        return UpsertResult.insert
+      }
+    }
+  }
+
+  func upsertAlbum(album: ExportedAlbum) throws -> UpsertResult {
+    let loggerMetadata: Logger.Metadata = [
+      "id": "\(album.id)",
+      "name": "\(album.name)",
+      "album_type": "\(album.albumType)"
+    ]
+    logger.debug("Upserting Album...", loggerMetadata)
+
+    return try dbQueue.write { db in
+      if let curr = try ExportedAlbum.fetchOne(db, id: album.id) {
+        logger.trace("Album already exists in DB - checking for changes...", loggerMetadata)
+
+        guard curr.needsUpdate(album) else {
+          logger.trace("Album hasn't changed - skipping", loggerMetadata)
+          return UpsertResult.nochange
+        }
+
+        logger.trace("Album changed - updating...", loggerMetadata)
+        try curr.updated(album).update(db)
+        return UpsertResult.update
+      } else {
+        try album.insert(db)
+        logger.trace("New Album inserted", loggerMetadata)
+        return UpsertResult.insert
+      }
+    }
+  }
+
+  func getLookupTableIdByName(table: LookupTable, name: String) throws -> Int64 {
+    let loggerMetadata: Logger.Metadata = [
+      "table": "\(table.rawValue)",
+      "name": "\(name)",
+    ]
+    logger.debug("Getting ID for Lookup Table value...", loggerMetadata)
+
+    return try dbQueue.write { db in
+      let rowOpt = try Row.fetchOne(
+        db,
+        sql: "SELECT id FROM \(table.rawValue) WHERE name = ?",
+        arguments: [name]
+      )
+
+      if let row: Row = rowOpt {
+        let id: Int64 = row["id"]
+        self.logger.trace(
+          "Value already exists in Lookup Table",
+          loggerMetadata.merging(["id": "\(id)"]) { $1 }
+        )
+        return id
+      } else {
+        try db.execute(sql: "INSERT INTO \(table.rawValue) (name) VALUES (?)", arguments: [name])
+        let id = db.lastInsertedRowID
+        self.logger.trace(
+          "Inserted new value into Lookup Table",
+          loggerMetadata.merging(["id": "\(id)"]) { $1 }
+        )
+        return id
+      }
+    }
+  }
+}
+
+enum UpsertResult {
+  case insert, update, nochange
+}
+
+enum InsertResult {
+  case insert, duplicate
+}
+
+enum ExporterDBError: Error {
+  case connectionFailed(String)
+  case missingMigrationBundle(String)
+  case migrationFailed(String)
+  case assetConversionFailed(String)
+  case unsupportedAlbumType(String)
+}

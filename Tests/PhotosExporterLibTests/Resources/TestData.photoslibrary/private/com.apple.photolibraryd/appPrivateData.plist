@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>DuplicateSharedLibraryEnabledMarker</key>
+	<true/>
+	<key>Library</key>
+	<dict>
+		<key>Identifier</key>
+		<dict>
+			<key>ContainerIdentifier</key>
+			<string>com.apple.photos</string>
+			<key>Name</key>
+			<string>Photos Library</string>
+			<key>Path</key>
+			<string>/Users/adamb/Pictures/Photos Library.photoslibrary</string>
+			<key>UUID</key>
+			<string>5439793B-4372-4C34-A8E8-A8F41261C8F9</string>
+			<key>UserDescription</key>
+			<string></string>
+		</dict>
+	</dict>
+</dict>
+</plist>

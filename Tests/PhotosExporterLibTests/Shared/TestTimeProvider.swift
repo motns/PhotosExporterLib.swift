@@ -1,0 +1,64 @@
+import Foundation
+@testable import PhotosExporterLib
+
+actor TestTimeProvider: TimeProvider {
+  private var frozenTimestampOpt: TimeInterval? = nil
+  var isTimeFrozen: Bool {
+    get {
+      frozenTimestampOpt != nil
+    }
+  }
+
+  func getDate() -> Date {
+    /*
+    There's a known issue with Date serialisation, whereby microseconds are truncated:
+    https://github.com/swiftlang/swift-foundation/issues/963
+    So the safe option is to use millisecond-precision Dates for now.
+    */
+    let timestamp = (self.frozenTimestampOpt ?? Date().timeIntervalSince1970 * 1000).rounded() / 1000
+    return Date(timeIntervalSince1970: timestamp)
+  }
+
+  func unfreezeTime() -> Self {
+    frozenTimestampOpt = nil
+    return self
+  }
+
+  func freezeTime() -> Self {
+    frozenTimestampOpt = Date().timeIntervalSince1970
+    return self
+  }
+
+  func setTime(timestamp: TimeInterval) -> Self {
+    frozenTimestampOpt = timestamp
+    return self
+  }
+  func setTime(date: Date) -> Self {
+    frozenTimestampOpt = date.timeIntervalSince1970
+    return self
+  }
+  func setTime(timeStr: String) -> Self {
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    frozenTimestampOpt = dateFormatter.date(from: timeStr)!.timeIntervalSince1970
+    return self
+  }
+
+  func advanceTime(seconds: Int) -> Self {
+    if !isTimeFrozen {
+      _ = freezeTime()
+    }
+
+    frozenTimestampOpt = frozenTimestampOpt! + Double(seconds)
+    return self
+  }
+  func advanceTime(minutes: Int) -> Self {
+    return advanceTime(seconds: minutes * 60)
+  }
+  func advanceTime(hours: Int) -> Self {
+    return advanceTime(seconds: hours * 3600)
+  }
+  func advanceTime(days: Int) -> Self {
+    return advanceTime(seconds: days * 3600 * 24)
+  }
+}
