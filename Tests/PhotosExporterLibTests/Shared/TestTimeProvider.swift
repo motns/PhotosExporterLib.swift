@@ -1,12 +1,10 @@
 import Foundation
 @testable import PhotosExporterLib
 
-actor TestTimeProvider: TimeProvider {
-  private var frozenTimestampOpt: TimeInterval? = nil
+final class TestTimeProvider: TimeProvider {
+  private var frozenTimestampOpt: TimeInterval?
   var isTimeFrozen: Bool {
-    get {
-      frozenTimestampOpt != nil
-    }
+    frozenTimestampOpt != nil
   }
 
   func getDate() -> Date {

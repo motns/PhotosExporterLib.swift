@@ -35,7 +35,7 @@ ExportResult(
     albumUpdated: 0,
     albumUnchanged: 0
   ),
-  fileCopy: PhotosExporterLib.FileCopyResults(
+  fileCopy: PhotosExporterLib.FileCopyResult(
     copied: 0,
     removed: 0
   )

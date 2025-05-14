@@ -1,0 +1,11 @@
+included: 
+  - Sources
+  - Tests
+
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+    excluded: [“^db$”]
+trailing_comma:
+  mandatory_comma: true

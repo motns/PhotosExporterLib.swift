@@ -1,16 +1,16 @@
 import Foundation
 
-public protocol TimeProvider: Actor {
+public protocol TimeProvider {
   func getDate() -> Date
 }
 
 extension TimeProvider {
-  func secondsPassedSince(_ d: Date) -> TimeInterval {
-    return getDate().timeIntervalSince(d)
+  func secondsPassedSince(_ start: Date) -> TimeInterval {
+    return getDate().timeIntervalSince(start)
   }
 }
 
-actor DefaultTimeProvider: TimeProvider {
+struct DefaultTimeProvider: TimeProvider {
   static let shared = DefaultTimeProvider()
 
   private init() {}
@@ -25,8 +25,8 @@ actor DefaultTimeProvider: TimeProvider {
     return Date(timeIntervalSince1970: timestamp)
   }
 
-  func secondsPassedSince(_ d: Date) -> TimeInterval {
-    return getDate().timeIntervalSince(d)
+  func secondsPassedSince(_ start: Date) -> TimeInterval {
+    return getDate().timeIntervalSince(start)
   }
 }
 

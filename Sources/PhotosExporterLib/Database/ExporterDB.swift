@@ -5,18 +5,15 @@ import GRDB
 /*
 Used to access our local DB containing a copy of information from the Photos DB
 */
-actor ExporterDB {
+struct ExporterDB {
   private let dbQueue: DatabaseQueue
   private let logger: ClassLogger
-  private let timeProvider: TimeProvider
 
   init(
     exportDBPath: String,
     logger: Logger,
-    timeProvider: TimeProvider
-  ) async throws {
+  ) throws {
     self.logger = ClassLogger(logger: logger, className: "ExporterDB")
-    self.timeProvider = timeProvider
 
     do {
       self.logger.debug("Connecting to Export DB...")
@@ -29,8 +26,8 @@ actor ExporterDB {
 
     do {
       self.logger.debug("Initialising Migrations...")
-      let migrations = try await Migrations(dbQueue: dbQueue, logger: logger)
-      try await migrations.runMigrations()
+      let migrations = try Migrations(dbQueue: dbQueue, logger: logger)
+      try migrations.runMigrations()
     } catch {
       self.logger.critical("Failed to migrate ExporterDB", [
         "error": "\(error)"
@@ -144,24 +141,23 @@ actor ExporterDB {
     }
   }
 
-  func upsertAsset(asset: ExportedAsset) async throws -> UpsertResult {
+  func upsertAsset(asset: ExportedAsset, now: Date? = nil) throws -> UpsertResult {
     let loggerMetadata: Logger.Metadata = [
       "asset_id": "\(asset.id)"
     ]
     logger.debug("Upserting Asset...", loggerMetadata)
 
-    let now = await timeProvider.getDate()
-    return try await dbQueue.write { db in
+    return try dbQueue.write { db in
       if let curr = try ExportedAsset.fetchOne(db, id: asset.id) {
         guard curr.needsUpdate(asset) else {
-          self.logger.trace("Asset hasn't changed - skipping", loggerMetadata)
+          logger.trace("Asset hasn't changed - skipping", loggerMetadata)
           return UpsertResult.nochange
         }
 
-        self.logger.trace("Asset changed - updating...", loggerMetadata)
-        try curr.updated(from: asset, now: now).update(db)
+        logger.trace("Asset changed - updating...", loggerMetadata)
+        try curr.updated(from: asset, now: now ?? Date()).update(db)
 
-        self.logger.trace("Asset updated", [
+        logger.trace("Asset updated", [
           "asset_id": "\(asset.id)",
           "is_favourite": "\(asset.isFavourite)",
           "geo_lat": "\(String(describing: asset.geoLat))",
@@ -173,7 +169,7 @@ actor ExporterDB {
         return UpsertResult.update
       } else {
         try asset.insert(db)
-        self.logger.trace("New Asset inserted", loggerMetadata)
+        logger.trace("New Asset inserted", loggerMetadata)
         return UpsertResult.insert
       }
     }
@@ -183,14 +179,14 @@ actor ExporterDB {
     let loggerMetadata: Logger.Metadata = [
       "asset_id": "\(file.assetId)",
       "file_type": "\(file.fileType)",
-      "original_file_name": "\(file.originalFileName)"
+      "original_file_name": "\(file.originalFileName)",
     ]
     logger.debug("Upserting File...", loggerMetadata)
 
     return try dbQueue.write { db in
       let currOpt = try ExportedFile.fetchOne(db, key: [
         ExportedFile.Col.assetId.name: file.assetId,
-        ExportedFile.Col.fileType.name: file.fileType.rawValue, // TODO - autoconvert?
+        ExportedFile.Col.fileType.name: file.fileType.rawValue,
         ExportedFile.Col.originalFileName.name: file.originalFileName,
       ])
 
@@ -213,7 +209,7 @@ actor ExporterDB {
           "imported_file_name": "\(file.importedFileName)",
           "was_copied": "\(file.wasCopied)",
           "isDeleted": "\(file.isDeleted)",
-          "deletedAt": "\(String(describing: file.deletedAt))"
+          "deletedAt": "\(String(describing: file.deletedAt))",
         ])
 
         return UpsertResult.update
@@ -246,7 +242,7 @@ actor ExporterDB {
         logger.trace("Folder updated", [
           "folder_id": "\(folder.id)",
           "folder_name": "\(folder.name)",
-          "parent_id": "\(String(describing: folder.parentId))"
+          "parent_id": "\(String(describing: folder.parentId))",
         ])
         return UpsertResult.update
       } else {
@@ -261,7 +257,7 @@ actor ExporterDB {
     let loggerMetadata: Logger.Metadata = [
       "id": "\(album.id)",
       "name": "\(album.name)",
-      "album_type": "\(album.albumType)"
+      "album_type": "\(album.albumType)",
     ]
     logger.debug("Upserting Album...", loggerMetadata)
 
@@ -284,7 +280,9 @@ actor ExporterDB {
       }
     }
   }
+}
 
+extension ExporterDB {
   func getLookupTableIdByName(table: LookupTable, name: String) throws -> Int64 {
     let loggerMetadata: Logger.Metadata = [
       "table": "\(table.rawValue)",

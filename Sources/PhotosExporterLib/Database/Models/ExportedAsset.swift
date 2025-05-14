@@ -8,10 +8,10 @@ enum AssetType: Int, Sendable, Codable {
 
   static func fromPhotokitAssetMediaType(_ pat: PhotokitAssetMediaType) -> AssetType? {
     return switch pat {
-      case .image: self.image
-      case .video: self.video
-      case .audio: self.audio
-      case .unknown: nil
+    case .image: self.image
+    case .video: self.video
+    case .audio: self.audio
+    case .unknown: nil
     }
   }
 }
@@ -37,12 +37,12 @@ struct ExportedAsset: Codable, Equatable {
   let isDeleted: Bool
   let deletedAt: Date?
 
-  func needsUpdate(_ b: ExportedAsset) -> Bool {
-    return self.isFavourite != b.isFavourite
-      || self.geoLat != b.geoLat
-      || self.geoLong != b.geoLong
-      || self.cityId != b.cityId
-      || self.countryId != b.countryId
+  func needsUpdate(_ other: ExportedAsset) -> Bool {
+    return self.isFavourite != other.isFavourite
+      || self.geoLat != other.geoLat
+      || self.geoLong != other.geoLong
+      || self.cityId != other.cityId
+      || self.countryId != other.countryId
   }
 
   func copy(

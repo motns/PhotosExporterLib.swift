@@ -52,10 +52,10 @@ struct ExportedAlbum: Codable, Equatable, Hashable {
 
   static func fromPhotokitAlbum(album: PhotokitAlbum) throws -> ExportedAlbum {
     let albumType: AlbumType = switch album.collectionSubtype {
-      case .albumRegular: .user
-      case .albumCloudShared: .shared
-      case let collectionSubtype:
-        throw ExporterDBError.unsupportedAlbumType(String(describing: collectionSubtype))
+    case .albumRegular: .user
+    case .albumCloudShared: .shared
+    case let collectionSubtype:
+      throw ExporterDBError.unsupportedAlbumType(String(describing: collectionSubtype))
     }
 
     return ExportedAlbum(

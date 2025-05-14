@@ -9,12 +9,11 @@ enum PhotokitAssetMediaType: Int, Sendable {
 
   static func fromPHAssetMediaType(_ amt: PHAssetMediaType) -> PhotokitAssetMediaType {
     return switch amt {
-      case .unknown: self.unknown
-      case .image: self.image
-      case .video: self.video
-      case .audio: self.audio
-      @unknown default:
-        fatalError("Unknown PHAssetMediaType: \(amt)")
+    case .unknown: self.unknown
+    case .image: self.image
+    case .video: self.video
+    case .audio: self.audio
+    @unknown default: fatalError("Unknown PHAssetMediaType: \(amt)")
     }
   }
 }
@@ -31,9 +30,7 @@ struct PhotokitAsset: Sendable {
   let resources: [PhotokitAssetResource]
 
   var uuid: String {
-    get {
-      String(id.split(separator: "/").first!)
-    }
+    String(id.split(separator: "/").first!)
   }
 
   static func fromPHAsset(

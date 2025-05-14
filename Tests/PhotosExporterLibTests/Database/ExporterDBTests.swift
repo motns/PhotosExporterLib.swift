@@ -4,6 +4,7 @@ import Testing
 @testable import PhotosExporterLib
 
 @Suite("Exporter DB tests")
+// swiftlint:disable:next type_body_length
 final class ExporterDBTests {
   let testDir: String
   let exporterDB: ExporterDB
@@ -15,10 +16,9 @@ final class ExporterDBTests {
     var logger = Logger(label: "io.motns.testing")
     logger.logLevel = .critical
     self.testTimeProvider = TestTimeProvider()
-    self.exporterDB = try await ExporterDB(
+    self.exporterDB = try ExporterDB(
       exportDBPath: dbPath,
       logger: logger,
-      timeProvider: self.testTimeProvider
     )
   }
 
@@ -46,21 +46,21 @@ final class ExporterDBTests {
     )
   }
 
-  func createAsset(city: String, country: String) async throws -> ExportedAsset {
-    let cityId = try await self.exporterDB.getLookupTableIdByName(
+  func createAsset(city: String, country: String) throws -> ExportedAsset {
+    let cityId = try self.exporterDB.getLookupTableIdByName(
       table: .city, name: city
     )
-    let countryId = try await self.exporterDB.getLookupTableIdByName(
+    let countryId = try self.exporterDB.getLookupTableIdByName(
       table: .country, name: country
     )
     return createAsset(cityId: cityId, countryId: countryId)
   }
 
-  func createAsset() async throws -> ExportedAsset {
-    return try await createAsset(city: "London", country: "United Kingdom")
+  func createAsset() throws -> ExportedAsset {
+    return try createAsset(city: "London", country: "United Kingdom")
   }
 
-  func createFile(asset: ExportedAsset, city: String?, country: String?) async -> ExportedFile {
+  func createFile(asset: ExportedAsset, city: String?, country: String?) -> ExportedFile {
     return ExportedFile(
       assetId: asset.id,
       fileType: FileType.originalImage,
@@ -89,7 +89,7 @@ final class ExporterDBTests {
       name: "Parent Folder",
       parentId: nil
     )
-    _ = try await exporterDB.upsertFolder(folder: parentFolder)
+    _ = try exporterDB.upsertFolder(folder: parentFolder)
 
     let childFolder1 = ExportedFolder(
       id: UUID().uuidString,
@@ -101,10 +101,10 @@ final class ExporterDBTests {
       name: "Child Folder 2",
       parentId: parentFolder.id
     )
-    _ = try await exporterDB.upsertFolder(folder: childFolder1)
-    _ = try await exporterDB.upsertFolder(folder: childFolder2)
+    _ = try exporterDB.upsertFolder(folder: childFolder1)
+    _ = try exporterDB.upsertFolder(folder: childFolder2)
 
-    let res = try await exporterDB.getFoldersWithParent(parentId: parentFolder.id)
+    let res = try exporterDB.getFoldersWithParent(parentId: parentFolder.id)
     #expect(Set(res) == Set([childFolder1, childFolder2]))
   }
 
@@ -115,7 +115,7 @@ final class ExporterDBTests {
       name: "Parent Folder",
       parentId: nil
     )
-    _ = try await exporterDB.upsertFolder(folder: parentFolder)
+    _ = try exporterDB.upsertFolder(folder: parentFolder)
 
     let album1 = ExportedAlbum(
       id: UUID().uuidString,
@@ -131,36 +131,36 @@ final class ExporterDBTests {
       name: "Album 2",
       assetIds: []
     )
-    _ = try await exporterDB.upsertAlbum(album: album1)
-    _ = try await exporterDB.upsertAlbum(album: album2)
+    _ = try exporterDB.upsertAlbum(album: album1)
+    _ = try exporterDB.upsertAlbum(album: album2)
 
-    let res = try await exporterDB.getAlbumsInFolder(folderId: parentFolder.id)
+    let res = try exporterDB.getAlbumsInFolder(folderId: parentFolder.id)
     #expect(Set(res) == Set([album1, album2]))
   }
 
   @Test("Get Files for Album")
   func getFilesForAlbum() async throws {
-    let asset1 = try await createAsset()
-    _ = try await self.exporterDB.upsertAsset(asset: asset1)
-    let file1 = await createFile(asset: asset1, city: "London", country: "United Kingdom")
-    _ = try await self.exporterDB.upsertFile(file: file1)
+    let asset1 = try createAsset()
+    _ = try self.exporterDB.upsertAsset(asset: asset1)
+    let file1 = createFile(asset: asset1, city: "London", country: "United Kingdom")
+    _ = try self.exporterDB.upsertFile(file: file1)
 
-    let asset2 = try await createAsset()
-    _ = try await self.exporterDB.upsertAsset(asset: asset2)
-    let file2 = await createFile(asset: asset2, city: "Madrid", country: "Spain")
-    _ = try await self.exporterDB.upsertFile(file: file2)
+    let asset2 = try createAsset()
+    _ = try self.exporterDB.upsertAsset(asset: asset2)
+    let file2 = createFile(asset: asset2, city: "Madrid", country: "Spain")
+    _ = try self.exporterDB.upsertFile(file: file2)
 
-    let asset3 = try await createAsset()
-    _ = try await self.exporterDB.upsertAsset(asset: asset3)
-    let file3 = await createFile(asset: asset3, city: "Budapest", country: "Hungary")
-    _ = try await self.exporterDB.upsertFile(file: file3)
+    let asset3 = try createAsset()
+    _ = try self.exporterDB.upsertAsset(asset: asset3)
+    let file3 = createFile(asset: asset3, city: "Budapest", country: "Hungary")
+    _ = try self.exporterDB.upsertFile(file: file3)
 
     let newFolder = ExportedFolder(
       id: UUID().uuidString,
       name: "My Folder",
       parentId: nil
     )
-    _ = try await self.exporterDB.upsertFolder(folder: newFolder)
+    _ = try self.exporterDB.upsertFolder(folder: newFolder)
 
     let newAlbum = ExportedAlbum(
       id: UUID().uuidString,
@@ -173,34 +173,34 @@ final class ExporterDBTests {
         asset3.id,
       ]
     )
-    _ = try await self.exporterDB.upsertAlbum(album: newAlbum)
+    _ = try self.exporterDB.upsertAlbum(album: newAlbum)
 
-    let filesForAlbum = try await self.exporterDB.getFilesForAlbum(albumId: newAlbum.id)
+    let filesForAlbum = try self.exporterDB.getFilesForAlbum(albumId: newAlbum.id)
     #expect(Set(filesForAlbum) == Set([file1, file2, file3]))
   }
 
   @Test("Upsert Asset - New")
   func upsertAssetNew() async throws {
-    let newAsset = try await createAsset()
-    let insertRes = try await self.exporterDB.upsertAsset(asset: newAsset)
+    let newAsset = try createAsset()
+    let insertRes = try self.exporterDB.upsertAsset(asset: newAsset)
     #expect(insertRes == UpsertResult.insert)
 
-    let insertedAsset = try? await exporterDB.getAsset(id: newAsset.id)
+    let insertedAsset = try? exporterDB.getAsset(id: newAsset.id)
     #expect(insertedAsset == newAsset)
   }
 
   @Test("Upsert Asset - Update")
   func upsertAssetUpdate() async throws {
-    let asset = try await createAsset()
+    let asset = try createAsset()
 
-    let insertRes = try await self.exporterDB.upsertAsset(asset: asset)
+    let insertRes = try self.exporterDB.upsertAsset(asset: asset)
     #expect(insertRes == UpsertResult.insert)
 
     let updated = asset.copy(isFavourite: true)
-    let updateRes = try await self.exporterDB.upsertAsset(asset: updated)
+    let updateRes = try self.exporterDB.upsertAsset(asset: updated)
     #expect(updateRes == UpsertResult.update)
 
-    let updatedAsset = try? await exporterDB.getAsset(id: asset.id)
+    let updatedAsset = try? exporterDB.getAsset(id: asset.id)
     let updatedToCheck = updated.copy(updatedAt: updatedAsset?.updatedAt)
     #expect(updatedAsset == updatedToCheck)
   }
@@ -209,17 +209,17 @@ final class ExporterDBTests {
   func upsertFileNew() async throws {
     let city = "London"
     let country = "United Kingdom"
-    let asset = try await createAsset(city: city, country: country)
-    _ = try await self.exporterDB.upsertAsset(asset: asset)
+    let asset = try createAsset(city: city, country: country)
+    _ = try self.exporterDB.upsertAsset(asset: asset)
 
-    let newFile = await createFile(asset: asset, city: city, country: country)
-    let insertRes = try await self.exporterDB.upsertFile(file: newFile)
+    let newFile = createFile(asset: asset, city: city, country: country)
+    let insertRes = try self.exporterDB.upsertFile(file: newFile)
     #expect(insertRes == UpsertResult.insert)
 
-    let duplicateRes = try await self.exporterDB.upsertFile(file: newFile)
+    let duplicateRes = try self.exporterDB.upsertFile(file: newFile)
     #expect(duplicateRes == UpsertResult.nochange)
 
-    let insertedFile = try? await exporterDB.getFile(
+    let insertedFile = try? exporterDB.getFile(
       assetId: newFile.assetId,
       fileType: newFile.fileType,
       originalFileName: newFile.originalFileName,
@@ -231,17 +231,17 @@ final class ExporterDBTests {
   func upsertFileUpdate() async throws {
     let city = "London"
     let country = "United Kingdom"
-    let asset = try await createAsset(city: city, country: country)
-    _ = try await self.exporterDB.upsertAsset(asset: asset)
+    let asset = try createAsset(city: city, country: country)
+    _ = try self.exporterDB.upsertAsset(asset: asset)
 
-    let newFile = await createFile(asset: asset, city: city, country: country)
-    let insertRes = try await self.exporterDB.upsertFile(file: newFile)
+    let newFile = createFile(asset: asset, city: city, country: country)
+    let insertRes = try self.exporterDB.upsertFile(file: newFile)
     #expect(insertRes == UpsertResult.insert)
 
     let updatedFile = newFile.copy(wasCopied: true)
-    _ = try await exporterDB.upsertFile(file: updatedFile)
+    _ = try exporterDB.upsertFile(file: updatedFile)
 
-    let updatedToCheck = try? await exporterDB.getFile(
+    let updatedToCheck = try? exporterDB.getFile(
       assetId: newFile.assetId,
       fileType: newFile.fileType,
       originalFileName: newFile.originalFileName,
@@ -256,10 +256,10 @@ final class ExporterDBTests {
       name: "New Folder",
       parentId: nil
     )
-    let res = try await self.exporterDB.upsertFolder(folder: newFolder)
+    let res = try self.exporterDB.upsertFolder(folder: newFolder)
     #expect(res == UpsertResult.insert)
 
-    let folderToCheck = try await self.exporterDB.getFolder(id: newFolder.id)
+    let folderToCheck = try self.exporterDB.getFolder(id: newFolder.id)
     #expect(folderToCheck == newFolder)
   }
 
@@ -270,14 +270,14 @@ final class ExporterDBTests {
       name: "My Folder",
       parentId: nil
     )
-    let insertRes = try await self.exporterDB.upsertFolder(folder: newFolder)
+    let insertRes = try self.exporterDB.upsertFolder(folder: newFolder)
     #expect(insertRes == UpsertResult.insert)
 
     let updatedFolder = newFolder.copy(name: "New Name")
-    let updatedRes = try await self.exporterDB.upsertFolder(folder: updatedFolder)
+    let updatedRes = try self.exporterDB.upsertFolder(folder: updatedFolder)
     #expect(updatedRes == UpsertResult.update)
 
-    let folderToCheck = try await self.exporterDB.getFolder(id: newFolder.id)
+    let folderToCheck = try self.exporterDB.getFolder(id: newFolder.id)
     #expect(folderToCheck == updatedFolder)
   }
 
@@ -288,7 +288,7 @@ final class ExporterDBTests {
       name: "My Folder",
       parentId: nil
     )
-    _ = try await self.exporterDB.upsertFolder(folder: newFolder)
+    _ = try self.exporterDB.upsertFolder(folder: newFolder)
 
     let newAlbum = ExportedAlbum(
       id: UUID().uuidString,
@@ -302,10 +302,10 @@ final class ExporterDBTests {
       ]
     )
 
-    let insertRes = try await self.exporterDB.upsertAlbum(album: newAlbum)
+    let insertRes = try self.exporterDB.upsertAlbum(album: newAlbum)
     #expect(insertRes == UpsertResult.insert)
 
-    let albumToCheck = try await self.exporterDB.getAlbum(id: newAlbum.id)
+    let albumToCheck = try self.exporterDB.getAlbum(id: newAlbum.id)
     #expect(albumToCheck == newAlbum)
   }
 
@@ -316,7 +316,7 @@ final class ExporterDBTests {
       name: "My Folder",
       parentId: nil
     )
-    _ = try await self.exporterDB.upsertFolder(folder: newFolder)
+    _ = try self.exporterDB.upsertFolder(folder: newFolder)
 
     let newAlbum = ExportedAlbum(
       id: UUID().uuidString,
@@ -329,18 +329,18 @@ final class ExporterDBTests {
         UUID().uuidString,
       ]
     )
-    let insertRes = try await self.exporterDB.upsertAlbum(album: newAlbum)
+    let insertRes = try self.exporterDB.upsertAlbum(album: newAlbum)
     #expect(insertRes == UpsertResult.insert)
 
     let updatedAlbum = newAlbum.copy(
       name: "Best Photos"
     )
-    let updateRes = try await self.exporterDB.upsertAlbum(album: updatedAlbum)
+    let updateRes = try self.exporterDB.upsertAlbum(album: updatedAlbum)
     #expect(updateRes == UpsertResult.update)
-    let nochangeRes = try await self.exporterDB.upsertAlbum(album: updatedAlbum)
+    let nochangeRes = try self.exporterDB.upsertAlbum(album: updatedAlbum)
     #expect(nochangeRes == UpsertResult.nochange)
 
-    let albumToCheck = try await self.exporterDB.getAlbum(id: newAlbum.id)
+    let albumToCheck = try self.exporterDB.getAlbum(id: newAlbum.id)
     #expect(albumToCheck == updatedAlbum)
   }
 }

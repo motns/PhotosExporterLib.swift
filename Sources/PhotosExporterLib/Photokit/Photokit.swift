@@ -2,8 +2,8 @@ import Foundation
 import Photos
 import Logging
 
-protocol PhotokitProtocol: Actor {
-  func getAllAssets() async -> [PhotokitAsset]
+protocol PhotokitProtocol {
+  func getAllAssets() -> [PhotokitAsset]
 
   func getAssetIdsForAlbumId(albumId: String) throws -> [String]
 
@@ -24,7 +24,7 @@ protocol PhotokitProtocol: Actor {
 /*
 Library for abstracting away calls to the Photokit framework
 */
-actor Photokit: PhotokitProtocol {
+struct Photokit: PhotokitProtocol {
   private let logger: ClassLogger
 
   static let RootFolderId = "ROOT"
@@ -54,17 +54,19 @@ actor Photokit: PhotokitProtocol {
     case .restricted:
       throw PhotokitError.authotisationError("You do not have permissions to give access to the Photos library")
     case .denied:
-      throw PhotokitError.authotisationError("Access to Photos has been denied to exporter - please grant full permission")
+      throw PhotokitError.authotisationError(
+        "Access to Photos has been denied to exporter - please grant full permission"
+      )
     case .notDetermined:
       // We haven't asked for access before
       switch await PHPhotoLibrary.requestAuthorization(for: PHAccessLevel.readWrite) {
-        case .authorized:
-          logger.debug("Received authorisation :D")
-          return
-        case .limited, .restricted, .denied, .notDetermined:
-          throw PhotokitError.authotisationError("You must grant full permission to the exporter")
-        @unknown default:
-          throw PhotokitError.unexpectedError("Received unrecognised authorisation status")
+      case .authorized:
+        logger.debug("Received authorisation :D")
+        return
+      case .limited, .restricted, .denied, .notDetermined:
+        throw PhotokitError.authotisationError("You must grant full permission to the exporter")
+      @unknown default:
+        throw PhotokitError.unexpectedError("Received unrecognised authorisation status")
       }
     @unknown default:
       throw PhotokitError.unexpectedError("Current authorisation status not recognised")
@@ -74,7 +76,7 @@ actor Photokit: PhotokitProtocol {
   func getAllAssets() -> [PhotokitAsset] {
     let allAssetsFetch = PHFetchOptions()
     allAssetsFetch.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
-    //allAssetsFetch.fetchLimit = 25
+    // allAssetsFetch.fetchLimit = 25
 
     var mainLibraryAssets = [PhotokitAsset]()
     PHAsset.fetchAssets(with: allAssetsFetch).enumerateObjects { asset, _, _ in
@@ -108,7 +110,7 @@ actor Photokit: PhotokitProtocol {
         "Unsupported Media Type for Asset",
         [
           "asset_id": "\(assetId)",
-          "media_type": "\(asset.mediaType)"
+          "media_type": "\(asset.mediaType)",
         ]
       )
       return nil
@@ -177,10 +179,11 @@ actor Photokit: PhotokitProtocol {
     return try getFolder(folderId: Photokit.RootFolderId, parentIdOpt: nil)
   }
 
+  // swiftlint:disable:next function_body_length
   func getFolder(folderId: String, parentIdOpt: String? = nil) throws -> PhotokitFolder {
     let folderOpt: PHCollectionList?
     let parentId: String?
-    
+
     if folderId == Photokit.RootFolderId {
       folderOpt = nil
       parentId = nil
@@ -196,7 +199,7 @@ actor Photokit: PhotokitProtocol {
       guard let pId = parentIdOpt else {
         throw PhotokitError.missingParentId
       }
-      
+
       folderOpt = collectionWithId
       parentId = pId
     }
@@ -261,7 +264,7 @@ actor Photokit: PhotokitProtocol {
     let assetResourceType = PhotokitAssetResourceType.fromExporterFileType(
       fileType: fileType
     ).toPHAssetResourceType()
-    var resourceOpt: PHAssetResource? = nil
+    var resourceOpt: PHAssetResource?
     for resource in PHAssetResource.assetResources(for: asset) {
       if resource.type == assetResourceType && resource.originalFilename == originalFileName {
         resourceOpt = resource
@@ -283,8 +286,8 @@ actor Photokit: PhotokitProtocol {
 
   func fetchResultToArray<T>(_ res: PHFetchResult<T>) -> [T] {
     var ls: [T] = []
-    res.enumerateObjects { o, _, _ in
-      ls.append(o)
+    res.enumerateObjects { object, _, _ in
+      ls.append(object)
     }
     return ls
   }

@@ -3,11 +3,11 @@ import Foundation
 import Logging
 import GRDB
 
-protocol PhotosDBProtocol: Actor {
-  func getAllAssetLocationsById() async throws -> [String: PostalAddress]
+protocol PhotosDBProtocol {
+  func getAllAssetLocationsById() throws -> [String: PostalAddress]
 }
 
-actor PhotosDB: PhotosDBProtocol {
+struct PhotosDB: PhotosDBProtocol {
   private let dbQueue: DatabaseQueue
   private let logger: ClassLogger
 
@@ -49,38 +49,17 @@ actor PhotosDB: PhotosDBProtocol {
         let uuid: String = row["uuid"]
 
         if let data = row["location_blob"] as? Data {
-          let geoInfoOpt = try NSKeyedUnarchiver.unarchivedObject(
-            ofClass: PLRevGeoLocationInfo.self, from: data
-          )
+          let postalAddressOpt = try decodePostalAddress(data: data)
 
-          if let geoInfo = geoInfoOpt {
-            let pa = geoInfo.postalAddress
-            locationById[uuid] = PostalAddress(
-              street: pa.street,
-              subLocality: pa.subLocality,
-              city: pa.city,
-              subAdministrativeArea: pa.subAdministrativeArea,
-              state: pa.state,
-              postalCode: pa.postalCode,
-              country: pa.country,
-              isoCountryCode: pa.isoCountryCode
-            )
-
-            logger.trace(
-              "Decoded location data for Asset",
-              [
-                "asset_id": "\(uuid)",
-                "country": "\(geoInfo.postalAddress.country)",
-                "city": "\(geoInfo.postalAddress.city)",
-              ]
-            )
-          } else {
+          guard let postalAddress = postalAddressOpt else {
             logger.error(
               "Location data for Asset invalid",
               ["asset_id": "\(uuid)"]
             )
             throw PhotosDBError.invalidGeoDataForAsset(uuid)
           }
+
+          locationById[uuid] = postalAddress
         } else {
           logger.trace(
             "Location data for Asset is empty",
@@ -91,6 +70,28 @@ actor PhotosDB: PhotosDBProtocol {
     }
 
     return locationById
+  }
+
+  private func decodePostalAddress(data: Data) throws -> PostalAddress? {
+    let geoInfoOpt = try NSKeyedUnarchiver.unarchivedObject(
+      ofClass: PLRevGeoLocationInfo.self, from: data
+    )
+
+    guard let geoInfo = geoInfoOpt else {
+      return nil
+    }
+
+    let pa = geoInfo.postalAddress
+    return PostalAddress(
+      street: pa.street,
+      subLocality: pa.subLocality,
+      city: pa.city,
+      subAdministrativeArea: pa.subAdministrativeArea,
+      state: pa.state,
+      postalCode: pa.postalCode,
+      country: pa.country,
+      isoCountryCode: pa.isoCountryCode
+    )
   }
 }
 

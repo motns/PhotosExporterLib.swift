@@ -17,10 +17,9 @@ final class PhotosExporterLibTests {
 
     self.photokitMock = PhotokitMock()
     self.timeProvider = TestTimeProvider()
-    let exporterDB = try await ExporterDB(
+    let exporterDB = try ExporterDB(
       exportDBPath: testDir + "/testdb.sqlite",
       logger: logger,
-      timeProvider: self.timeProvider,
     )
 
     self.photosExporterLib = PhotosExporterLib(
@@ -28,9 +27,7 @@ final class PhotosExporterLibTests {
       photokit: self.photokitMock,
       exporterDB: exporterDB,
       photosDB: PhotosDBMock(),
-      countryLookup: CachedLookupTable(table: .country, exporterDB: exporterDB, logger: logger),
-      cityLookup: CachedLookupTable(table: .city, exporterDB: exporterDB, logger: logger),
-      classLogger: ClassLogger(logger: logger, className: "PhotosExporterLib"),
+      logger: logger,
       timeProvider: self.timeProvider,
     )
   }
@@ -62,7 +59,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0
       ),
-      fileCopy: FileCopyResults(copied: 0, removed: 0)
+      fileCopy: FileCopyResult(copied: 0, removed: 0)
     )
 
     let res = try await self.photosExporterLib.export()
@@ -70,7 +67,7 @@ final class PhotosExporterLibTests {
   }
 }
 
-actor PhotokitMock: PhotokitProtocol {
+struct PhotokitMock: PhotokitProtocol {
   func getAssetIdsForAlbumId(albumId: String) -> [String] {
     return []
   }
@@ -99,8 +96,8 @@ actor PhotokitMock: PhotokitProtocol {
     return []
   }
 
-  func getAllAssets() async -> [PhotokitAsset] {
-    return []   
+  func getAllAssets() -> [PhotokitAsset] {
+    return []
   }
 
   func copyResource(
@@ -111,8 +108,8 @@ actor PhotokitMock: PhotokitProtocol {
   }
 }
 
-actor PhotosDBMock: PhotosDBProtocol {
-  func getAllAssetLocationsById() async throws -> [String : PostalAddress] {
+struct PhotosDBMock: PhotosDBProtocol {
+  func getAllAssetLocationsById() throws -> [String: PostalAddress] {
     return [:]
   }
 }

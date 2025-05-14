@@ -7,12 +7,12 @@ import Testing
 final class PhotosDBTests {
   let photosDB: PhotosDB
 
-  init() {
+  init() throws {
     var logger = Logger(label: "io.motns.testing")
     logger.logLevel = .critical
 
     if let url = Bundle.module.url(forResource: "TestDB", withExtension: "sqlite") {
-      self.photosDB = try! PhotosDB(
+      self.photosDB = try PhotosDB(
         photosDBPath: url.absoluteString,
         logger: logger
       )
@@ -22,8 +22,8 @@ final class PhotosDBTests {
   }
 
   @Test("Get all Asset locations by ID")
-  func getAllAssetLocationsById() async {
-    let locationsById = try! await photosDB.getAllAssetLocationsById()
+  func getAllAssetLocationsById() async throws {
+    let locationsById = try photosDB.getAllAssetLocationsById()
 
     let expected = [
       "A3891C03-91F5-4E01-B005-4E4F2DF63853": PostalAddress(

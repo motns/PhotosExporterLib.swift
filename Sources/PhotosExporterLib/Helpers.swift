@@ -1,7 +1,11 @@
 import Foundation
 
 struct FileHelper {
-  public static func pathForDateAndLocation(dateOpt: Date?, countryOpt: String? = nil, cityOpt: String? = nil) -> String {
+  public static func pathForDateAndLocation(
+    dateOpt: Date?,
+    countryOpt: String? = nil,
+    cityOpt: String? = nil
+  ) -> String {
     let calendar = Calendar.current
     let year: String
     let month: String
@@ -15,13 +19,13 @@ struct FileHelper {
     }
 
     let countryComponent = switch countryOpt {
-      case .some(let country) where country != "": "-\(normaliseForPath(country))"
-      default: ""
+    case .some(let country) where country != "": "-\(normaliseForPath(country))"
+    default: ""
     }
 
     let cityComponent = switch cityOpt {
-      case .some(let city) where city != "": "-\(normaliseForPath(city))"
-      default: ""
+    case .some(let city) where city != "": "-\(normaliseForPath(city))"
+    default: ""
     }
 
     return "\(year)/\(year)-\(month)\(countryComponent)\(cityComponent)"
@@ -58,10 +62,10 @@ struct FileHelper {
 
   public static func createDirectory(path: String) throws -> Bool {
     var isDirectory: ObjCBool = false
-    if (FileManager.default.fileExists(
+    if FileManager.default.fileExists(
       atPath: path,
       isDirectory: &isDirectory
-    ) && !isDirectory.boolValue) {
+    ) && !isDirectory.boolValue {
       throw FileHelperError.fileExistsAtDirectoryPath(path)
     }
 

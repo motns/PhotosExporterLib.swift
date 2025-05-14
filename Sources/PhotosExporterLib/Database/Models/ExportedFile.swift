@@ -12,8 +12,23 @@ enum FileType: Int, Sendable, Codable {
 
   func isEdited() -> Bool {
     switch self {
-      case .editedImage, .editedVideo, .editedLiveVideo: true
-      default: false
+    case .editedImage, .editedVideo, .editedLiveVideo: true
+    default: false
+    }
+  }
+
+  static func fromPhotokitAssetResourceType(
+    _ assetResourceType: PhotokitAssetResourceType
+  ) -> FileType? {
+    return switch assetResourceType {
+    case .photo: FileType.originalImage
+    case .video: FileType.originalVideo
+    case .audio: FileType.originalAudio
+    case .pairedVideo: FileType.originalLiveVideo
+    case .fullSizePhoto: FileType.editedImage
+    case .fullSizeVideo: FileType.editedVideo
+    case .fullSizePairedVideo: FileType.editedLiveVideo
+    default: nil
     }
   }
 }
@@ -41,23 +56,23 @@ struct ExportedFile: Codable, Equatable, Hashable {
     case deletedAt = "deleted_at"
   }
 
-  func needsUpdate(_ b: ExportedFile) -> Bool {
-    return self.importedFileDir != b.importedFileDir
-      || self.importedFileName != b.importedFileName
+  func needsUpdate(_ other: ExportedFile) -> Bool {
+    return self.importedFileDir != other.importedFileDir
+      || self.importedFileName != other.importedFileName
       // It shouldn't be possible to unset the "copied" flag
-      || (!self.wasCopied && b.wasCopied)
-      || self.isDeleted != b.isDeleted
-      || self.deletedAt != b.deletedAt
+      || (!self.wasCopied && other.wasCopied)
+      || self.isDeleted != other.isDeleted
+      || self.deletedAt != other.deletedAt
   }
 
-  func updated(_ b: ExportedFile) -> ExportedFile {
+  func updated(_ from: ExportedFile) -> ExportedFile {
     return self.copy(
-      importedFileDir: b.importedFileDir,
-      importedFileName: b.importedFileName,
+      importedFileDir: from.importedFileDir,
+      importedFileName: from.importedFileName,
       // It shouldn't normally be possible to unset the "copied" flag
-      wasCopied: self.wasCopied || b.wasCopied,
-      isDeleted: b.isDeleted,
-      deletedAt: b.deletedAt,
+      wasCopied: self.wasCopied || from.wasCopied,
+      isDeleted: from.isDeleted,
+      deletedAt: from.deletedAt,
     )
   }
 
@@ -90,24 +105,25 @@ struct ExportedFile: Codable, Equatable, Hashable {
     resource: PhotokitAssetResource,
     countryOpt: String?,
     cityOpt: String?,
-    now: Date
+    now: Date?
   ) -> ExportedFile? {
-    guard let fileType = resource.fileTypeOpt else {
+    let fileTypeOpt = FileType.fromPhotokitAssetResourceType(resource.assetResourceType)
+    guard let fileType = fileTypeOpt else {
       // We should never make it here
       // Unsupported types should be filtered upstream, but this is more graceful
       return nil
     }
 
     let isEdited = switch fileType {
-      case .editedImage, .editedVideo, .editedLiveVideo: true
-      default: false
+    case .editedImage, .editedVideo, .editedLiveVideo: true
+    default: false
     }
 
     return ExportedFile(
       assetId: resource.assetId,
       fileType: fileType,
       originalFileName: resource.originalFileName,
-      importedAt: now,
+      importedAt: now ?? Date(),
       importedFileDir: FileHelper.pathForDateAndLocation(
         dateOpt: asset.createdAt,
         countryOpt: countryOpt,

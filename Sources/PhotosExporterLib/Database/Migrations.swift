@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 import Logging
 
-actor Migrations {
+struct Migrations {
   private var migrator: DatabaseMigrator
   private let dbQueue: DatabaseQueue
   private let logger: ClassLogger
@@ -10,33 +10,41 @@ actor Migrations {
   init(
     dbQueue: DatabaseQueue,
     logger: Logger
-  ) async throws {
+  ) throws {
     self.migrator = DatabaseMigrator()
     self.dbQueue = dbQueue
     self.logger = ClassLogger(logger: logger, className: "Migrations")
 
-    try registerMigrations()
+    LookupTablesMigration.register(&migrator)
+    MainTablesInitialMigration.register(&migrator)
   }
 
   func runMigrations() throws {
     try migrator.migrate(dbQueue)
   }
+}
 
-  private func registerMigrations() throws {
+private protocol MigrationDef {
+  static func register(_ migrator: inout DatabaseMigrator)
+}
+
+private struct LookupTablesMigration: MigrationDef {
+  // swiftlint:disable:next function_body_length
+  static func register(_ migrator: inout DatabaseMigrator) {
     migrator.registerMigration("Lookup tables") { db in
-      try db.create(table: "country") { t in
-        t.primaryKey("id", .integer)
-        t.column("name", .text).notNull().unique()
+      try db.create(table: "country") { table in
+        table.primaryKey("id", .integer)
+        table.column("name", .text).notNull().unique()
       }
 
-      try db.create(table: "city") { t in
-        t.primaryKey("id", .integer)
-        t.column("name", .text).notNull().unique()
+      try db.create(table: "city") { table in
+        table.primaryKey("id", .integer)
+        table.column("name", .text).notNull().unique()
       }
 
-      try db.create(table: "asset_type") { t in
-        t.primaryKey("id", .integer)
-        t.column("name", .text).notNull().unique()
+      try db.create(table: "asset_type") { table in
+        table.primaryKey("id", .integer)
+        table.column("name", .text).notNull().unique()
       }
 
       try db.execute(literal: """
@@ -46,9 +54,9 @@ actor Migrations {
       (3, \("audio"))
       """)
 
-      try db.create(table: "file_type") { t in
-        t.primaryKey("id", .integer)
-        t.column("name", .text).notNull().unique()
+      try db.create(table: "file_type") { table in
+        table.primaryKey("id", .integer)
+        table.column("name", .text).notNull().unique()
       }
 
       try db.execute(literal: """
@@ -62,9 +70,9 @@ actor Migrations {
       (7, \("edited_live_video"))
       """)
 
-      try db.create(table: "album_type") { t in
-        t.primaryKey("id", .integer)
-        t.column("name", .text).notNull().unique()
+      try db.create(table: "album_type") { table in
+        table.primaryKey("id", .integer)
+        table.column("name", .text).notNull().unique()
       }
 
       try db.execute(literal: """
@@ -73,9 +81,9 @@ actor Migrations {
       (2, \("shared"))
       """)
 
-      try db.create(table: "asset_library") { t in
-        t.primaryKey("id", .integer)
-        t.column("name", .text).notNull().unique()
+      try db.create(table: "asset_library") { table in
+        table.primaryKey("id", .integer)
+        table.column("name", .text).notNull().unique()
       }
 
       try db.execute(literal: """
@@ -85,51 +93,55 @@ actor Migrations {
       (3, \("shared_album"))
       """)
     }
+  }
+}
 
+private struct MainTablesInitialMigration: MigrationDef {
+  static func register(_ migrator: inout DatabaseMigrator) {
     migrator.registerMigration("Main tables - initial") { db in
-      try db.create(table: "asset") { t in
-        t.primaryKey("id", .text).notNull()
-        t.column("asset_type_id", .integer).notNull().references("asset_type")
-        t.column("asset_library_id", .integer).notNull().references("asset_library")
-        t.column("created_at", .datetime)
-        t.column("updated_at", .datetime)
-        t.column("imported_at", .datetime).notNull()
-        t.column("is_favourite", .boolean).notNull()
-        t.column("geo_lat", .double)
-        t.column("geo_long", .double)
-        t.column("country_id", .integer).references("country")
-        t.column("city_id", .integer).references("city")
-        t.column("is_deleted", .boolean).notNull()
-        t.column("deleted_at", .datetime)
+      try db.create(table: "asset") { table in
+        table.primaryKey("id", .text).notNull()
+        table.column("asset_type_id", .integer).notNull().references("asset_type")
+        table.column("asset_library_id", .integer).notNull().references("asset_library")
+        table.column("created_at", .datetime)
+        table.column("updated_at", .datetime)
+        table.column("imported_at", .datetime).notNull()
+        table.column("is_favourite", .boolean).notNull()
+        table.column("geo_lat", .double)
+        table.column("geo_long", .double)
+        table.column("country_id", .integer).references("country")
+        table.column("city_id", .integer).references("city")
+        table.column("is_deleted", .boolean).notNull()
+        table.column("deleted_at", .datetime)
       }
 
-      try db.create(table: "file") { t in 
-        t.column("asset_id", .text).notNull().references("asset")
-        t.column("file_type_id", .integer).notNull().references("file_type")
-        t.column("original_file_name", .text).notNull()
-        t.primaryKey(["asset_id", "file_type_id", "original_file_name"])
-        t.column("imported_at", .datetime).notNull()
-        t.column("imported_file_dir", .text).notNull()
-        t.column("imported_file_name", .text).notNull()
-        t.column("was_copied", .boolean).notNull()
-        t.column("is_deleted", .boolean).notNull()
-        t.column("deleted_at", .datetime)
+      try db.create(table: "file") { table in
+        table.column("asset_id", .text).notNull().references("asset")
+        table.column("file_type_id", .integer).notNull().references("file_type")
+        table.column("original_file_name", .text).notNull()
+        table.primaryKey(["asset_id", "file_type_id", "original_file_name"])
+        table.column("imported_at", .datetime).notNull()
+        table.column("imported_file_dir", .text).notNull()
+        table.column("imported_file_name", .text).notNull()
+        table.column("was_copied", .boolean).notNull()
+        table.column("is_deleted", .boolean).notNull()
+        table.column("deleted_at", .datetime)
       }
 
-      try db.create(table: "album_folder") { t in
-        t.primaryKey("id", .text).notNull()
-        t.column("name", .text).notNull()
-        t.column("parent_id", .text).references("album_folder")
+      try db.create(table: "album_folder") { table in
+        table.primaryKey("id", .text).notNull()
+        table.column("name", .text).notNull()
+        table.column("parent_id", .text).references("album_folder")
       }
 
       try db.create(indexOn: "album_folder", columns: ["parent_id"])
 
-      try db.create(table: "album") { t in
-        t.primaryKey("id", .text).notNull()
-        t.column("album_type_id", .integer).notNull().references("album_type")
-        t.column("album_folder_id", .text).notNull().references("album_folder")
-        t.column("name", .text).notNull()
-        t.column("asset_ids", .jsonb).notNull()
+      try db.create(table: "album") { table in
+        table.primaryKey("id", .text).notNull()
+        table.column("album_type_id", .integer).notNull().references("album_type")
+        table.column("album_folder_id", .text).notNull().references("album_folder")
+        table.column("name", .text).notNull()
+        table.column("asset_ids", .jsonb).notNull()
       }
 
       try db.create(indexOn: "album", columns: ["album_folder_id"])
