@@ -99,52 +99,11 @@ private struct LookupTablesMigration: MigrationDef {
 private struct MainTablesInitialMigration: MigrationDef {
   static func register(_ migrator: inout DatabaseMigrator) {
     migrator.registerMigration("Main tables - initial") { db in
-      try db.create(table: "asset") { table in
-        table.primaryKey("id", .text).notNull()
-        table.column("asset_type_id", .integer).notNull().references("asset_type")
-        table.column("asset_library_id", .integer).notNull().references("asset_library")
-        table.column("created_at", .datetime)
-        table.column("updated_at", .datetime)
-        table.column("imported_at", .datetime).notNull()
-        table.column("is_favourite", .boolean).notNull()
-        table.column("geo_lat", .double)
-        table.column("geo_long", .double)
-        table.column("country_id", .integer).references("country")
-        table.column("city_id", .integer).references("city")
-        table.column("is_deleted", .boolean).notNull()
-        table.column("deleted_at", .datetime)
-      }
-
-      try db.create(table: "file") { table in
-        table.column("asset_id", .text).notNull().references("asset")
-        table.column("file_type_id", .integer).notNull().references("file_type")
-        table.column("original_file_name", .text).notNull()
-        table.primaryKey(["asset_id", "file_type_id", "original_file_name"])
-        table.column("imported_at", .datetime).notNull()
-        table.column("imported_file_dir", .text).notNull()
-        table.column("imported_file_name", .text).notNull()
-        table.column("was_copied", .boolean).notNull()
-        table.column("is_deleted", .boolean).notNull()
-        table.column("deleted_at", .datetime)
-      }
-
-      try db.create(table: "album_folder") { table in
-        table.primaryKey("id", .text).notNull()
-        table.column("name", .text).notNull()
-        table.column("parent_id", .text).references("album_folder")
-      }
-
-      try db.create(indexOn: "album_folder", columns: ["parent_id"])
-
-      try db.create(table: "album") { table in
-        table.primaryKey("id", .text).notNull()
-        table.column("album_type_id", .integer).notNull().references("album_type")
-        table.column("album_folder_id", .text).notNull().references("album_folder")
-        table.column("name", .text).notNull()
-        table.column("asset_ids", .jsonb).notNull()
-      }
-
-      try db.create(indexOn: "album", columns: ["album_folder_id"])
+      try ExportedAsset.createTable(db)
+      try ExportedFile.createTable(db)
+      try ExportedAssetFile.createTable(db)
+      try ExportedFolder.createTable(db)
+      try ExportedAlbum.createTable(db)
     }
   }
 }

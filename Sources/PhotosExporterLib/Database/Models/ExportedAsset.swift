@@ -139,7 +139,7 @@ struct ExportedAsset: Codable, Equatable {
 extension ExportedAsset: Identifiable, TableRecord, PersistableRecord, FetchableRecord {
   static let databaseTableName = "asset"
 
-  enum Col {
+  enum Columns {
     static let id = Column(CodingKeys.id)
     static let assetType = Column(CodingKeys.assetType)
     static let createdAt = Column(CodingKeys.createdAt)
@@ -152,5 +152,23 @@ extension ExportedAsset: Identifiable, TableRecord, PersistableRecord, Fetchable
     static let countryId = Column(CodingKeys.countryId)
     static let isDeleted = Column(CodingKeys.isDeleted)
     static let deletedAt = Column(CodingKeys.deletedAt)
+  }
+
+  static func createTable(_ db: Database) throws {
+    try db.create(table: "asset") { table in
+      table.primaryKey("id", .text).notNull()
+      table.column("asset_type_id", .integer).notNull().references("asset_type")
+      table.column("asset_library_id", .integer).notNull().references("asset_library")
+      table.column("created_at", .datetime)
+      table.column("updated_at", .datetime)
+      table.column("imported_at", .datetime).notNull()
+      table.column("is_favourite", .boolean).notNull()
+      table.column("geo_lat", .double)
+      table.column("geo_long", .double)
+      table.column("country_id", .integer).references("country")
+      table.column("city_id", .integer).references("city")
+      table.column("is_deleted", .boolean).notNull()
+      table.column("deleted_at", .datetime)
+    }
   }
 }

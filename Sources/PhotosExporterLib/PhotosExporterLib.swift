@@ -163,7 +163,7 @@ public struct PhotosExporterLib {
     logger.info("Running Export...")
     let startDate = timeProvider.getDate()
 
-    let exportAssetResult = try assetExporter.export(isEnabled: assetExportEnabled)
+    let exportAssetResult = try await assetExporter.export(isEnabled: assetExportEnabled)
     let albumExportResult = try collectionExporter.export(isEnabled: collectionExportEnabled)
     let copyResults = try await fileCopier.copy(isEnabled: fileCopyEnabled)
     try symlinkCreator.create()

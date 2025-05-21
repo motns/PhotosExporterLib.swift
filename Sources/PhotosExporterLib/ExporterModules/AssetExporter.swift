@@ -26,7 +26,7 @@ struct AssetExporter {
     self.timeProvider = timeProvider
   }
 
-  func export(isEnabled: Bool = true) throws -> AssetExportResult {
+  func export(isEnabled: Bool = true) async throws -> AssetExportResult {
     guard isEnabled else {
       logger.warning("Asset export disabled - skipping")
       return AssetExportResult.empty()
@@ -35,7 +35,7 @@ struct AssetExporter {
     let startDate = timeProvider.getDate()
 
     let assetLocationById = try photosDB.getAllAssetLocationsById()
-    let allPhotokitAssets = photokit.getAllAssets()
+    let allPhotokitAssets = try await photokit.getAllAssets()
     var assetResults = [UpsertResult?]()
     var fileResults = [UpsertResult?]()
 
@@ -89,39 +89,49 @@ struct AssetExporter {
     cityOpt: String?,
   ) throws -> UpsertResult? {
     // Filter out supplementary files like adjustment data
-        guard FileType.fromPhotokitAssetResourceType(resource.assetResourceType) != nil else {
-          logger.trace(
-            "Unsupported file type for Asset Resource",
-            [
-              "asset_id": "\(asset.id)",
-              "resource_type": "\(resource.assetResourceType)",
-              "original_file_name": "\(resource.originalFileName)",
-            ]
-          )
-          return nil
-        }
+    guard FileType.fromPhotokitAssetResourceType(resource.assetResourceType) != nil else {
+      logger.trace(
+        "Unsupported file type for Asset Resource",
+        [
+          "asset_id": "\(asset.id)",
+          "resource_type": "\(resource.assetResourceType)",
+          "original_file_name": "\(resource.originalFileName)",
+        ]
+      )
+      return nil
+    }
 
-        let exportedFileOpt = ExportedFile.fromPhotokitAssetResource(
-          asset: asset,
-          resource: resource,
-          countryOpt: countryOpt,
-          cityOpt: cityOpt,
-          now: timeProvider.getDate()
-        )
+    let exportedFileOpt = ExportedFile.fromPhotokitAssetResource(
+      asset: asset,
+      resource: resource,
+      countryOpt: countryOpt,
+      cityOpt: cityOpt,
+      now: timeProvider.getDate()
+    )
 
-        guard let exportedFile = exportedFileOpt else {
-          logger.warning(
-            "Could not convert Photokit Asset Resource to Exported File",
-            [
-              "asset_id": "\(asset.id)",
-              "resource_type": "\(resource.assetResourceType)",
-              "original_file_name": "\(resource.originalFileName)",
-            ]
-          )
-          return nil
-        }
+    guard let exportedFile = exportedFileOpt else {
+      logger.warning(
+        "Could not convert Photokit Asset Resource to Exported File",
+        [
+          "asset_id": "\(asset.id)",
+          "resource_type": "\(resource.assetResourceType)",
+          "original_file_name": "\(resource.originalFileName)",
+        ]
+      )
+      return nil
+    }
 
-        return try exporterDB.upsertFile(file: exportedFile)
+    let fileResult = try exporterDB.upsertFile(file: exportedFile)
+
+    let assetFile = ExportedAssetFile(
+      assetId: asset.id,
+      fileId: exportedFile.id,
+      isDeleted: false, // Implicitly false, since we have the Resource right here
+      deletedAt: nil,
+    )
+    let assetFileResult = try exporterDB.upsertAssetFile(assetFile: assetFile)
+
+    return fileResult.merge(assetFileResult)
   }
 
   // swiftlint:disable:next cyclomatic_complexity

@@ -71,11 +71,23 @@ struct ExportedAlbum: Codable, Equatable, Hashable {
 extension ExportedAlbum: Identifiable, TableRecord, PersistableRecord, FetchableRecord {
   static let databaseTableName = "album"
 
-  enum Col {
+  enum Columns {
     static let id = Column(CodingKeys.id)
     static let name = Column(CodingKeys.name)
     static let albumType = Column(CodingKeys.albumType)
     static let albumFolderId = Column(CodingKeys.albumFolderId)
     static let assetIds = Column(CodingKeys.assetIds)
+  }
+
+  static func createTable(_ db: Database) throws {
+    try db.create(table: "album") { table in
+      table.primaryKey("id", .text).notNull()
+      table.column("album_type_id", .integer).notNull().references("album_type")
+      table.column("album_folder_id", .text).notNull().references("album_folder")
+      table.column("name", .text).notNull()
+      table.column("asset_ids", .jsonb).notNull()
+    }
+
+    try db.create(indexOn: "album", columns: ["album_folder_id"])
   }
 }

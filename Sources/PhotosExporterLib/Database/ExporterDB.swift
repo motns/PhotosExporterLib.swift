@@ -37,7 +37,7 @@ struct ExporterDB {
   }
 
   func getAsset(id: String) throws -> ExportedAsset? {
-    logger.debug("Retrieving Asset with ID", [
+    logger.debug("Retrieving Asset", [
       "asset_id": "\(id)"
     ])
 
@@ -46,19 +46,20 @@ struct ExporterDB {
     }
   }
 
-  func getFile(assetId: String, fileType: FileType, originalFileName: String) throws -> ExportedFile? {
-    logger.debug("Retrieving File", [
-      "asset_id": "\(assetId)",
-      "file_type_id": "\(fileType)",
-      "original_file_name": "\(originalFileName)",
-    ])
+  func getFile(id: String) throws -> ExportedFile? {
+    logger.debug("Retrieving File", ["id": "\(id)"])
 
     return try dbQueue.read { db in
-      try ExportedFile.fetchOne(db, key: [
-        ExportedFile.Col.assetId.name: assetId,
-        ExportedFile.Col.fileType.name: fileType.rawValue,
-        ExportedFile.Col.originalFileName.name: originalFileName,
-      ])
+      try ExportedFile.fetchOne(db, id: id)
+    }
+  }
+
+  func getAssetFile(assetId: String, fileId: String) throws -> ExportedAssetFile? {
+    return try dbQueue.read { db in
+      try ExportedAssetFile.filter {
+        $0.assetId == assetId
+        && $0.fileId == fileId
+      }.fetchOne(db)
     }
   }
 
@@ -108,16 +109,53 @@ struct ExporterDB {
     }
   }
 
-  func getFilesToCopy() throws -> [ExportedFile] {
+  func markFileAsCopied(id: String) throws {
+    _ = try dbQueue.write { db in
+      try ExportedFile
+        .filter(id: id)
+        .updateAll(db) {
+          $0.wasCopied.set(to: true)
+        }
+    }
+  }
+
+  func markFileAsDeleted(id: String, now: Date? = nil) throws {
+    return try dbQueue.write { db in
+      try ExportedAssetFile.filter {
+        $0.fileId == id
+      }.updateAll(db) {
+        [
+          $0.isDeleted.set(to: true),
+          $0.deletedAt.set(to: now ?? Date()),
+        ]
+      }
+    }
+  }
+
+  func getFilesWithAssetIdsToCopy() throws -> [ExportedFileWithAssetIds] {
     logger.debug("Getting Files to copy...")
 
     return try dbQueue.read { db in
-      try ExportedFile
-        .filter(
-          ExportedFile.Col.wasCopied == false
-          && ExportedFile.Col.isDeleted == false
-        )
-        .fetchAll(db)
+      try ExportedFileWithAssetIds.fetchAll(
+        db,
+        sql: """
+        SELECT
+          file.*,
+          asset_file_by_file.asset_ids
+        FROM file
+          JOIN (
+            SELECT
+              file_id,
+              json_group_array(asset_id) As asset_ids,
+              max(is_deleted) AS is_deleted
+            FROM asset_file
+            GROUP BY file_id
+          ) AS asset_file_by_file ON asset_file_by_file.file_id = file.id
+        WHERE
+          file.was_copied = false
+          AND asset_file_by_file.is_deleted = 0
+        """
+      )
     }
   }
 
@@ -127,17 +165,25 @@ struct ExporterDB {
     ])
 
     return try dbQueue.read { db in
-      try ExportedFile.filter(
+      try ExportedFile.fetchAll(
+        db,
         sql: """
-        asset_id IN(
-          SELECT value
-          FROM album
-            JOIN json_each(album.asset_ids)
-          WHERE album.id = ?
+        SELECT
+          file.*
+        FROM file
+        WHERE file.id IN(
+          SELECT file_id
+          FROM asset_file
+          WHERE asset_id IN(
+            SELECT value
+            FROM album
+              JOIN json_each(album.asset_ids)
+            WHERE album.id = ?
+          )
         )
         """,
         arguments: [albumId]
-      ).fetchAll(db)
+      )
     }
   }
 
@@ -177,18 +223,12 @@ struct ExporterDB {
 
   func upsertFile(file: ExportedFile) throws -> UpsertResult {
     let loggerMetadata: Logger.Metadata = [
-      "asset_id": "\(file.assetId)",
-      "file_type": "\(file.fileType)",
-      "original_file_name": "\(file.originalFileName)",
+      "id": "\(file.id)",
     ]
     logger.debug("Upserting File...", loggerMetadata)
 
     return try dbQueue.write { db in
-      let currOpt = try ExportedFile.fetchOne(db, key: [
-        ExportedFile.Col.assetId.name: file.assetId,
-        ExportedFile.Col.fileType.name: file.fileType.rawValue,
-        ExportedFile.Col.originalFileName.name: file.originalFileName,
-      ])
+      let currOpt = try ExportedFile.fetchOne(db, id: file.id)
 
       if let curr = currOpt {
         logger.trace("File already exists in DB - checking for changes...", loggerMetadata)
@@ -202,20 +242,56 @@ struct ExporterDB {
         try curr.updated(file).update(db)
 
         logger.trace("File updated", [
-          "asset_id": "\(file.assetId)",
-          "file_type": "\(file.fileType)",
-          "original_file_name": "\(file.originalFileName)",
+          "id": "\(file.id)",
           "imported_file_dir": "\(file.importedFileDir)",
           "imported_file_name": "\(file.importedFileName)",
           "was_copied": "\(file.wasCopied)",
-          "isDeleted": "\(file.isDeleted)",
-          "deletedAt": "\(String(describing: file.deletedAt))",
         ])
 
         return UpsertResult.update
       } else {
         try file.insert(db)
         logger.trace("New File inserted", loggerMetadata)
+        return UpsertResult.insert
+      }
+    }
+  }
+
+  func upsertAssetFile(assetFile: ExportedAssetFile) throws -> UpsertResult {
+    let loggerMetadata: Logger.Metadata = [
+      "asset_id": "\(assetFile.assetId)",
+      "file_id": "\(assetFile.fileId)",
+    ]
+    logger.debug("Upserting Asset File link...", loggerMetadata)
+
+    return try dbQueue.write { db in
+      let currOpt = try ExportedAssetFile.filter {
+        $0.assetId == assetFile.assetId
+        && $0.fileId == assetFile.fileId
+      }.fetchOne(db)
+
+      if let curr = currOpt {
+        logger.trace("Asset File link already exists in DB - checking for changes...", loggerMetadata)
+
+        guard curr.needsUpdate(assetFile) else {
+          logger.trace("Asset File link hasn't changed - skipping", loggerMetadata)
+          return UpsertResult.nochange
+        }
+
+        logger.trace("Asset File link changed - updating...", loggerMetadata)
+        try curr.updated(assetFile).update(db)
+
+        logger.trace("Asset File link updated", [
+          "asset_id": "\(assetFile.assetId)",
+          "file_id": "\(assetFile.fileId)",
+          "is_deleted": "\(assetFile.isDeleted)",
+          "deleted_at": "\(String(describing: assetFile.deletedAt))",
+        ])
+
+        return UpsertResult.update
+      } else {
+        try assetFile.insert(db)
+        logger.trace("New Asset File link inserted", loggerMetadata)
         return UpsertResult.insert
       }
     }
@@ -319,6 +395,10 @@ extension ExporterDB {
 
 enum UpsertResult {
   case insert, update, nochange
+
+  func merge(_ other: UpsertResult) -> UpsertResult {
+    return (self == .nochange) ? other : self
+  }
 }
 
 enum InsertResult {

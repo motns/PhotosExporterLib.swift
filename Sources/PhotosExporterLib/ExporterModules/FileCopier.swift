@@ -22,7 +22,6 @@ struct FileCopier {
     self.logger = ClassLogger(logger: logger, className: "FileCopier")
   }
 
-  // swiftlint:disable:next function_body_length
   func copy(isEnabled: Bool = false) async throws -> FileCopyResult {
     guard isEnabled else {
       logger.warning("File copying disabled - skipping")
@@ -31,9 +30,9 @@ struct FileCopier {
     let startDate = timeProvider.getDate()
 
     logger.info("Getting Files to copy from local DB...")
-    let filesToCopy = try exporterDB.getFilesToCopy()
+    let filesWithAssetIdToCopy = try exporterDB.getFilesWithAssetIdsToCopy()
 
-    guard filesToCopy.count > 0 else {
+    guard filesWithAssetIdToCopy.count > 0 else {
       logger.info("No Files to copy")
       return FileCopyResult(copied: 0, removed: 0)
     }
@@ -41,50 +40,35 @@ struct FileCopier {
     logger.info("Copying files...")
     var copiedCount = 0
     var removedCount = 0
-    for fileToCopy in filesToCopy {
-      let destinationDirURL = filesDirURL.appending(path: fileToCopy.importedFileDir)
-      let loggerMetadata: Logger.Metadata = [
-        "asset_id": "\(fileToCopy.assetId)",
-        "file_type": "\(fileToCopy.fileType)",
-        "original_file_name": "\(fileToCopy.originalFileName)",
-      ]
+    for toCopy in filesWithAssetIdToCopy {
+      let destinationDirURL = filesDirURL.appending(path: toCopy.exportedFile.importedFileDir)
+      let loggerMetadata: Logger.Metadata = ["id": "\(toCopy.exportedFile.id)"]
 
       if try FileHelper.createDirectory(path: destinationDirURL.path(percentEncoded: false)) {
         logger.trace("Created destination directory: \(destinationDirURL.path(percentEncoded: false))")
       }
-      let destinationFileURL = destinationDirURL.appending(path: fileToCopy.importedFileName)
+      let destinationFileURL = destinationDirURL.appending(path: toCopy.exportedFile.importedFileName)
 
       let copyResult = try await photokit.copyResource(
-        assetId: fileToCopy.assetId,
-        fileType: fileToCopy.fileType,
-        originalFileName: fileToCopy.originalFileName,
+        assetId: toCopy.assetIds.first!,
+        fileType: toCopy.exportedFile.fileType,
+        originalFileName: toCopy.exportedFile.originalFileName,
         destination: destinationFileURL
       )
 
       if copyResult == .exists {
-        // These could be due to the Exporter previously crashing before updating the
-        // record in the DB, but it's also possible that two or more assets are using
-        // the exact same Resource - this happens when you create virtual copies in the
-        // Photos library.
-        logger.debug("File was already copied but not updated in DB", loggerMetadata)
+        logger.warning("File was already copied but not updated in DB", loggerMetadata)
       }
 
       switch copyResult {
       case .removed:
-        logger.trace("File removed in Photos - marking as deleted in DB...", loggerMetadata)
+        logger.trace("File removed in Photos - marking link as deleted in DB...", loggerMetadata)
         removedCount += 1
-        let updatedFile = fileToCopy.copy(
-          isDeleted: true,
-          deletedAt: timeProvider.getDate()
-        )
-        _ = try exporterDB.upsertFile(file: updatedFile)
+        _ = try exporterDB.markFileAsDeleted(id: toCopy.exportedFile.id, now: timeProvider.getDate())
       case .exists, .copied:
         logger.trace("File successfully copied - updating DB...", loggerMetadata)
         copiedCount += 1
-        let updatedFile = fileToCopy.copy(
-          wasCopied: true
-        )
-        _ = try exporterDB.upsertFile(file: updatedFile)
+        _ = try exporterDB.markFileAsCopied(id: toCopy.exportedFile.id)
       }
       logger.trace("File updated in DB", loggerMetadata)
     }

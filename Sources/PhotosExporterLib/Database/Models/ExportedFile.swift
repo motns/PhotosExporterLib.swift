@@ -34,69 +34,63 @@ enum FileType: Int, Sendable, Codable {
 }
 
 struct ExportedFile: Codable, Equatable, Hashable {
-  let assetId: String
+  let id: String
   let fileType: FileType
   let originalFileName: String
+  let fileSize: Int64
   let importedAt: Date
   let importedFileDir: String
   let importedFileName: String
   let wasCopied: Bool
-  let isDeleted: Bool
-  let deletedAt: Date?
 
   enum CodingKeys: String, CodingKey {
-    case assetId = "asset_id"
+    case id = "id"
     case fileType = "file_type_id"
     case originalFileName = "original_file_name"
+    case fileSize = "file_size"
     case importedAt = "imported_at"
     case importedFileDir = "imported_file_dir"
     case importedFileName = "imported_file_name"
     case wasCopied = "was_copied"
-    case isDeleted = "is_deleted"
-    case deletedAt = "deleted_at"
   }
 
   func needsUpdate(_ other: ExportedFile) -> Bool {
     return self.importedFileDir != other.importedFileDir
       || self.importedFileName != other.importedFileName
+      || self.fileSize != other.fileSize
       // It shouldn't be possible to unset the "copied" flag
       || (!self.wasCopied && other.wasCopied)
-      || self.isDeleted != other.isDeleted
-      || self.deletedAt != other.deletedAt
   }
 
   func updated(_ from: ExportedFile) -> ExportedFile {
     return self.copy(
+      fileSize: from.fileSize,
       importedFileDir: from.importedFileDir,
       importedFileName: from.importedFileName,
       // It shouldn't normally be possible to unset the "copied" flag
       wasCopied: self.wasCopied || from.wasCopied,
-      isDeleted: from.isDeleted,
-      deletedAt: from.deletedAt,
     )
   }
 
   func copy(
-    assetId: String? = nil,
+    id: String? = nil,
     fileType: FileType? = nil,
     originalFileName: String? = nil,
+    fileSize: Int64? = nil,
     importedAt: Date? = nil,
     importedFileDir: String? = nil,
     importedFileName: String? = nil,
     wasCopied: Bool? = nil,
-    isDeleted: Bool? = nil,
-    deletedAt: Date?? = nil
   ) -> ExportedFile {
     return ExportedFile(
-      assetId: assetId ?? self.assetId,
+      id: id ?? self.id,
       fileType: fileType ?? self.fileType,
       originalFileName: originalFileName ?? self.originalFileName,
+      fileSize: fileSize ?? self.fileSize,
       importedAt: importedAt ?? self.importedAt,
       importedFileDir: importedFileDir ?? self.importedFileDir,
       importedFileName: importedFileName ?? self.importedFileName,
       wasCopied: wasCopied ?? self.wasCopied,
-      isDeleted: isDeleted ?? self.isDeleted,
-      deletedAt: deletedAt ?? self.deletedAt
     )
   }
 
@@ -105,7 +99,7 @@ struct ExportedFile: Codable, Equatable, Hashable {
     resource: PhotokitAssetResource,
     countryOpt: String?,
     cityOpt: String?,
-    now: Date?
+    now: Date?,
   ) -> ExportedFile? {
     let fileTypeOpt = FileType.fromPhotokitAssetResourceType(resource.assetResourceType)
     guard let fileType = fileTypeOpt else {
@@ -119,10 +113,20 @@ struct ExportedFile: Codable, Equatable, Hashable {
     default: false
     }
 
+    let datePrefix: String
+    if let date = asset.createdAt {
+      let formatter = DateFormatter()
+      formatter.dateFormat = "yyyyMMddHHmmss"
+      datePrefix = formatter.string(from: date)
+    } else {
+      datePrefix = "00000000000000"
+    }
+
     return ExportedFile(
-      assetId: resource.assetId,
+      id: "\(datePrefix)-\(resource.fileSize)-\(resource.originalFileName)",
       fileType: fileType,
       originalFileName: resource.originalFileName,
+      fileSize: resource.fileSize,
       importedAt: now ?? Date(),
       importedFileDir: FileHelper.pathForDateAndLocation(
         dateOpt: asset.createdAt,
@@ -135,24 +139,33 @@ struct ExportedFile: Codable, Equatable, Hashable {
         isEdited: isEdited
       ),
       wasCopied: false,
-      isDeleted: false, // Implicitly false
-      deletedAt: nil
     )
   }
 }
 
-extension ExportedFile: TableRecord, PersistableRecord, FetchableRecord {
+extension ExportedFile: Identifiable, TableRecord, PersistableRecord, FetchableRecord {
   static let databaseTableName = "file"
 
-  enum Col {
-    static let assetId = Column(CodingKeys.assetId)
+  enum Columns {
+    static let id = Column(CodingKeys.id)
     static let fileType = Column(CodingKeys.fileType)
     static let originalFileName = Column(CodingKeys.originalFileName)
     static let importedAt = Column(CodingKeys.importedAt)
     static let importedFileDir = Column(CodingKeys.importedFileDir)
     static let importedFileName = Column(CodingKeys.importedFileName)
     static let wasCopied = Column(CodingKeys.wasCopied)
-    static let isDeleted = Column(CodingKeys.isDeleted)
-    static let deletedAt = Column(CodingKeys.deletedAt)
+  }
+
+  static func createTable(_ db: Database) throws {
+    try db.create(table: "file") { table in
+      table.primaryKey("id", .text).notNull()
+      table.column("file_type_id", .integer).notNull().references("file_type")
+      table.column("original_file_name", .text).notNull()
+      table.column("file_size", .integer).notNull()
+      table.column("imported_at", .datetime).notNull()
+      table.column("imported_file_dir", .text).notNull()
+      table.column("imported_file_name", .text).notNull()
+      table.column("was_copied", .boolean).notNull()
+    }
   }
 }

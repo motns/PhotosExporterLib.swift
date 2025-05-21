@@ -3,7 +3,7 @@ import Photos
 import Logging
 
 protocol PhotokitProtocol {
-  func getAllAssets() -> [PhotokitAsset]
+  func getAllAssets() async throws -> [PhotokitAsset]
 
   func getAssetIdsForAlbumId(albumId: String) throws -> [String]
 
@@ -73,27 +73,28 @@ struct Photokit: PhotokitProtocol {
     }
   }
 
-  func getAllAssets() -> [PhotokitAsset] {
+  func getAllAssets() async throws -> [PhotokitAsset] {
     let allAssetsFetch = PHFetchOptions()
     allAssetsFetch.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
     // allAssetsFetch.fetchLimit = 25
 
     var mainLibraryAssets = [PhotokitAsset]()
-    PHAsset.fetchAssets(with: allAssetsFetch).enumerateObjects { asset, _, _ in
-      if let photokitAsset = self.getPhotokitAssetForPHAsset(asset: asset, library: .personalLibrary) {
+    // TODO - Rewrite this to use recursion instead via .nextObject()
+    for asset in fetchResultToArray(PHAsset.fetchAssets(with: allAssetsFetch)) {
+      if let photokitAsset = try await self.getPhotokitAssetForPHAsset(asset: asset, library: .personalLibrary) {
         mainLibraryAssets.append(photokitAsset)
       }
     }
 
     var sharedAlbumAssets = [PhotokitAsset]()
-
-    PHAssetCollection.fetchAssetCollections(
+    for sharedAlbum in fetchResultToArray(PHAssetCollection.fetchAssetCollections(
       with: .album,
       subtype: .albumCloudShared,
       options: nil
-    ).enumerateObjects { sharedAlbum, _, _ in
-      PHAsset.fetchAssets(in: sharedAlbum, options: allAssetsFetch).enumerateObjects { asset, _, _ in
-        if let photokitAsset = self.getPhotokitAssetForPHAsset(asset: asset, library: .sharedAlbum) {
+    )) {
+      // TODO - Rewrite this to use recursion instead via .nextObject()
+      for asset in fetchResultToArray(PHAsset.fetchAssets(in: sharedAlbum, options: allAssetsFetch)) {
+        if let photokitAsset = try await self.getPhotokitAssetForPHAsset(asset: asset, library: .sharedAlbum) {
           sharedAlbumAssets.append(photokitAsset)
         }
       }
@@ -102,7 +103,7 @@ struct Photokit: PhotokitProtocol {
     return mainLibraryAssets + sharedAlbumAssets
   }
 
-  private func getPhotokitAssetForPHAsset(asset: PHAsset, library: AssetLibrary) -> PhotokitAsset? {
+  private func getPhotokitAssetForPHAsset(asset: PHAsset, library: AssetLibrary) async throws -> PhotokitAsset? {
     let assetId = asset.localIdentifier
 
     guard [.audio, .image, .video].contains(asset.mediaType) else {
@@ -116,18 +117,20 @@ struct Photokit: PhotokitProtocol {
       return nil
     }
 
-    let resources = PHAssetResource.assetResources(for: asset).map { resource in
+    var resources = [PhotokitAssetResource]()
+    for resource in PHAssetResource.assetResources(for: asset) {
       self.logger.trace("Converting PHAssetResource to PhotokitAssetResource...", [
         "asset_id": "\(assetId)",
         "type": "\(resource.type)",
         "original_file_name": "\(resource.originalFilename)",
       ])
-      return PhotokitAssetResource.fromPHAssetResource(resource: resource)
+      let fileSize = try await self.getResourceSize(resource: resource)
+      resources.append(PhotokitAssetResource.fromPHAssetResource(resource: resource, fileSize: fileSize))
     }
+
     self.logger.trace("Converting PHAsset to PhotokitAsset...", [
       "asset_id": "\(assetId)"
     ])
-
     return PhotokitAsset.fromPHAsset(asset: asset, library: library, resources: resources)
   }
 
@@ -248,6 +251,42 @@ struct Photokit: PhotokitProtocol {
       subfolders: subfolders,
       albums: albums,
     )
+  }
+
+  private func getResourceSize(resource: PHAssetResource) async throws -> Int64 {
+    let loggerMetadata: Logger.Metadata = [
+      "asset_id": "\(resource.assetLocalIdentifier)",
+      "file_type": "\(resource.type)",
+      "original_file_name": "\(resource.originalFilename)",
+    ]
+    logger.trace("Getting size for Asset Resource...", loggerMetadata)
+
+    // This is an undocumented attribute, so the behaviour is mainly speculation,
+    // but it's been suggested that it may be set to 0 if the Resource hasn't yet been
+    // downloaded from iCloud to the local device
+    if let fileSize = resource.value(forKey: "fileSize") as? Int64, fileSize != 0 {
+      return fileSize
+    } else {
+      logger.warning(
+        "fileSize attribute missing or zero for Asset Resource - reading it from file contents...",
+        loggerMetadata
+      )
+      var fileSize: Int64 = 0
+      return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int64, Error>) in
+        PHAssetResourceManager.default().requestData(
+          for: resource,
+          options: nil,
+        ) { data in
+          fileSize += Int64(data.count)
+        } completionHandler: { error in
+          if let error {
+            continuation.resume(throwing: error)
+          } else {
+            continuation.resume(returning: fileSize)
+          }
+        }
+      }
+    }
   }
 
   func copyResource(

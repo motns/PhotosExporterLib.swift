@@ -46,9 +46,19 @@ struct ExportedFolder: Codable, Equatable, Hashable {
 extension ExportedFolder: Identifiable, TableRecord, PersistableRecord, FetchableRecord {
   static let databaseTableName = "album_folder"
 
-  enum Col {
+  enum Columns {
     static let id = Column(CodingKeys.id)
     static let name = Column(CodingKeys.name)
     static let parentId = Column(CodingKeys.parentId)
+  }
+
+  static func createTable(_ db: Database) throws {
+    try db.create(table: "album_folder") { table in
+      table.primaryKey("id", .text).notNull()
+      table.column("name", .text).notNull()
+      table.column("parent_id", .text).references("album_folder")
+    }
+
+    try db.create(indexOn: "album_folder", columns: ["parent_id"])
   }
 }
