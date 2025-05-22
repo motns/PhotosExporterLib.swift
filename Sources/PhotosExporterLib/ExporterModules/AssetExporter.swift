@@ -35,11 +35,11 @@ struct AssetExporter {
     let startDate = timeProvider.getDate()
 
     let assetLocationById = try photosDB.getAllAssetLocationsById()
-    let allPhotokitAssets = try await photokit.getAllAssets()
+    let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
     var assetResults = [UpsertResult?]()
     var fileResults = [UpsertResult?]()
 
-    for photokitAsset in allPhotokitAssets {
+    while let photokitAsset = try await allPhotokitAssetsResult.next() {
       let assetLocationOpt = assetLocationById[photokitAsset.uuid]
 
       let (countryOpt, countryIdOpt): (String?, Int64?) = switch assetLocationOpt?.country {

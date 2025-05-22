@@ -68,6 +68,10 @@ final class PhotosExporterLibTests {
 }
 
 struct PhotokitMock: PhotokitProtocol {
+  func getAllAssetsResult() -> any AssetFetchResultProtocol {
+    return AssetFetchResultMock()
+  }
+
   func getAssetIdsForAlbumId(albumId: String) -> [String] {
     return []
   }
@@ -96,10 +100,6 @@ struct PhotokitMock: PhotokitProtocol {
     return []
   }
 
-  func getAllAssets() -> [PhotokitAsset] {
-    return []
-  }
-
   func copyResource(
     assetId: String,
     fileType: FileType,
@@ -111,5 +111,18 @@ struct PhotokitMock: PhotokitProtocol {
 struct PhotosDBMock: PhotosDBProtocol {
   func getAllAssetLocationsById() throws -> [String: PostalAddress] {
     return [:]
+  }
+}
+
+struct AssetFetchResultMock: AssetFetchResultProtocol {
+  func reset() {
+  }
+
+  func hasNext() -> Bool {
+    return false
+  }
+
+  func next() async throws -> PhotokitAsset? {
+    return nil
   }
 }

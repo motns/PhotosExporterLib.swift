@@ -3,7 +3,7 @@ import Photos
 import Logging
 
 protocol PhotokitProtocol {
-  func getAllAssets() async throws -> [PhotokitAsset]
+  func getAllAssetsResult() async throws -> any AssetFetchResultProtocol
 
   func getAssetIdsForAlbumId(albumId: String) throws -> [String]
 
@@ -73,34 +73,46 @@ struct Photokit: PhotokitProtocol {
     }
   }
 
-  func getAllAssets() async throws -> [PhotokitAsset] {
+  typealias AssetFetchResult = PhotokitFetchResult<PHAsset, PhotokitAsset>
+
+  func getAllAssetsResult() async throws -> any AssetFetchResultProtocol {
     let allAssetsFetch = PHFetchOptions()
     allAssetsFetch.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
     // allAssetsFetch.fetchLimit = 25
 
-    var mainLibraryAssets = [PhotokitAsset]()
-    // TODO - Rewrite this to use recursion instead via .nextObject()
-    for asset in fetchResultToArray(PHAsset.fetchAssets(with: allAssetsFetch)) {
-      if let photokitAsset = try await self.getPhotokitAssetForPHAsset(asset: asset, library: .personalLibrary) {
-        mainLibraryAssets.append(photokitAsset)
-      }
-    }
+    var fetchResults = [AssetFetchResult]()
 
-    var sharedAlbumAssets = [PhotokitAsset]()
+    fetchResults.append(PhotokitFetchResult(PHAsset.fetchAssets(with: allAssetsFetch)) { asset in
+      if let photokitAsset = try await self.getPhotokitAssetForPHAsset(
+        asset: asset,
+        library: .personalLibrary
+      ) {
+        return .success(photokitAsset)
+      } else {
+        return .skip
+      }
+    })
+
     for sharedAlbum in fetchResultToArray(PHAssetCollection.fetchAssetCollections(
       with: .album,
       subtype: .albumCloudShared,
       options: nil
     )) {
-      // TODO - Rewrite this to use recursion instead via .nextObject()
-      for asset in fetchResultToArray(PHAsset.fetchAssets(in: sharedAlbum, options: allAssetsFetch)) {
-        if let photokitAsset = try await self.getPhotokitAssetForPHAsset(asset: asset, library: .sharedAlbum) {
-          sharedAlbumAssets.append(photokitAsset)
+      fetchResults.append(PhotokitFetchResult(
+        PHAsset.fetchAssets(in: sharedAlbum, options: allAssetsFetch)
+      ) { asset in
+        if let photokitAsset = try await self.getPhotokitAssetForPHAsset(
+          asset: asset,
+          library: .sharedAlbum
+        ) {
+          return .success(photokitAsset)
+        } else {
+          return .skip
         }
-      }
+      })
     }
 
-    return mainLibraryAssets + sharedAlbumAssets
+    return AssetFetchResultBatch(fetchResults)
   }
 
   private func getPhotokitAssetForPHAsset(asset: PHAsset, library: AssetLibrary) async throws -> PhotokitAsset? {
