@@ -47,3 +47,25 @@ struct FileHelperTests {
     #expect(FileHelper.normaliseForPath(input) == out)
   }
 }
+
+@Suite("Date Helper tests")
+struct DateHelperTests {
+  @Test("Safe Equals")
+  func safeEquals() {
+
+    #expect(DateHelper.safeEquals(
+      Date(timeIntervalSince1970: 1269099904),
+      Date(timeIntervalSince1970: 1269099904),
+    ) == true)
+
+    #expect(DateHelper.safeEquals(
+      Date(timeIntervalSince1970: 1269099904.123),
+      Date(timeIntervalSince1970: 1269099904.456),
+    ) == true)
+
+    #expect(DateHelper.safeEquals(
+      Date(timeIntervalSince1970: 1269099904),
+      Date(timeIntervalSince1970: 1269099905),
+    ) == false)
+  }
+}

@@ -2,12 +2,7 @@ import Foundation
 
 public protocol TimeProvider {
   func getDate() -> Date
-}
-
-extension TimeProvider {
-  func secondsPassedSince(_ start: Date) -> TimeInterval {
-    return getDate().timeIntervalSince(start)
-  }
+  func secondsPassedSince(_ start: Date) -> TimeInterval
 }
 
 struct DefaultTimeProvider: TimeProvider {

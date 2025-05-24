@@ -89,7 +89,6 @@ enum PhotokitAssetResourceType: Int, Sendable {
 }
 
 struct PhotokitAssetResource: Sendable {
-  let assetId: String
   let assetResourceType: PhotokitAssetResourceType
   let originalFileName: String
   let fileSize: Int64
@@ -99,7 +98,6 @@ struct PhotokitAssetResource: Sendable {
     fileSize: Int64,
   ) -> PhotokitAssetResource {
     return PhotokitAssetResource(
-      assetId: resource.assetLocalIdentifier,
       assetResourceType: PhotokitAssetResourceType.fromPHAssetResourceType(assetResourceType: resource.type),
       originalFileName: resource.originalFilename,
       fileSize: fileSize,

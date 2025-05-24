@@ -5,6 +5,7 @@ import GRDB
 /*
 Used to access our local DB containing a copy of information from the Photos DB
 */
+// swiftlint:disable file_length
 struct ExporterDB {
   private let dbQueue: DatabaseQueue
   private let logger: ClassLogger
@@ -35,6 +36,42 @@ struct ExporterDB {
       throw ExporterDBError.migrationFailed("\(error)")
     }
   }
+}
+
+// -- MARK: Reading
+extension ExporterDB {
+  func getLookupTableIdByName(table: LookupTable, name: String) throws -> Int64 {
+    let loggerMetadata: Logger.Metadata = [
+      "table": "\(table.rawValue)",
+      "name": "\(name)",
+    ]
+    logger.debug("Getting ID for Lookup Table value...", loggerMetadata)
+
+    return try dbQueue.write { db in
+      let rowOpt = try Row.fetchOne(
+        db,
+        sql: "SELECT id FROM \(table.rawValue) WHERE name = ?",
+        arguments: [name]
+      )
+
+      if let row: Row = rowOpt {
+        let id: Int64 = row["id"]
+        self.logger.trace(
+          "Value already exists in Lookup Table",
+          loggerMetadata.merging(["id": "\(id)"]) { $1 }
+        )
+        return id
+      } else {
+        try db.execute(sql: "INSERT INTO \(table.rawValue) (name) VALUES (?)", arguments: [name])
+        let id = db.lastInsertedRowID
+        self.logger.trace(
+          "Inserted new value into Lookup Table",
+          loggerMetadata.merging(["id": "\(id)"]) { $1 }
+        )
+        return id
+      }
+    }
+  }
 
   func getAsset(id: String) throws -> ExportedAsset? {
     logger.debug("Retrieving Asset", [
@@ -46,6 +83,12 @@ struct ExporterDB {
     }
   }
 
+  func getAllAssets() throws -> [ExportedAsset] {
+    return try dbQueue.read { db in
+      try ExportedAsset.fetchAll(db)
+    }
+  }
+
   func getFile(id: String) throws -> ExportedFile? {
     logger.debug("Retrieving File", ["id": "\(id)"])
 
@@ -54,7 +97,18 @@ struct ExporterDB {
     }
   }
 
+  func getAllFiles() throws -> [ExportedFile] {
+    return try dbQueue.read { db in
+      try ExportedFile.fetchAll(db)
+    }
+  }
+
   func getAssetFile(assetId: String, fileId: String) throws -> ExportedAssetFile? {
+    logger.debug("Retrieving Asset File", [
+      "asset_id": "\(assetId)",
+      "file_id": "\(fileId)",
+    ])
+
     return try dbQueue.read { db in
       try ExportedAssetFile.filter {
         $0.assetId == assetId
@@ -108,7 +162,10 @@ struct ExporterDB {
       ).fetchAll(db)
     }
   }
+}
 
+// - MARK: Writing
+extension ExporterDB {
   func markFileAsCopied(id: String) throws {
     _ = try dbQueue.write { db in
       try ExportedFile
@@ -353,41 +410,6 @@ struct ExporterDB {
         try album.insert(db)
         logger.trace("New Album inserted", loggerMetadata)
         return UpsertResult.insert
-      }
-    }
-  }
-}
-
-extension ExporterDB {
-  func getLookupTableIdByName(table: LookupTable, name: String) throws -> Int64 {
-    let loggerMetadata: Logger.Metadata = [
-      "table": "\(table.rawValue)",
-      "name": "\(name)",
-    ]
-    logger.debug("Getting ID for Lookup Table value...", loggerMetadata)
-
-    return try dbQueue.write { db in
-      let rowOpt = try Row.fetchOne(
-        db,
-        sql: "SELECT id FROM \(table.rawValue) WHERE name = ?",
-        arguments: [name]
-      )
-
-      if let row: Row = rowOpt {
-        let id: Int64 = row["id"]
-        self.logger.trace(
-          "Value already exists in Lookup Table",
-          loggerMetadata.merging(["id": "\(id)"]) { $1 }
-        )
-        return id
-      } else {
-        try db.execute(sql: "INSERT INTO \(table.rawValue) (name) VALUES (?)", arguments: [name])
-        let id = db.lastInsertedRowID
-        self.logger.trace(
-          "Inserted new value into Lookup Table",
-          loggerMetadata.merging(["id": "\(id)"]) { $1 }
-        )
-        return id
       }
     }
   }

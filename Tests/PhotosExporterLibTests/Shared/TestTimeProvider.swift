@@ -8,13 +8,7 @@ final class TestTimeProvider: TimeProvider {
   }
 
   func getDate() -> Date {
-    /*
-    There's a known issue with Date serialisation, whereby microseconds are truncated:
-    https://github.com/swiftlang/swift-foundation/issues/963
-    So the safe option is to use millisecond-precision Dates for now.
-    */
-    let timestamp = (self.frozenTimestampOpt ?? Date().timeIntervalSince1970 * 1000).rounded() / 1000
-    return Date(timeIntervalSince1970: timestamp)
+    return Date(timeIntervalSince1970: self.frozenTimestampOpt ?? Date().timeIntervalSince1970)
   }
 
   func unfreezeTime() -> Self {
@@ -58,5 +52,9 @@ final class TestTimeProvider: TimeProvider {
   }
   func advanceTime(days: Int) -> Self {
     return advanceTime(seconds: days * 3600 * 24)
+  }
+
+  func secondsPassedSince(_ start: Date) -> TimeInterval {
+    return getDate().timeIntervalSince(start)
   }
 }

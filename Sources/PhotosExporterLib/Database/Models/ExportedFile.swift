@@ -62,6 +62,17 @@ struct ExportedFile: Codable, Equatable, Hashable {
       || (!self.wasCopied && other.wasCopied)
   }
 
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.id == rhs.id
+      && lhs.fileType == rhs.fileType
+      && lhs.originalFileName == rhs.originalFileName
+      && lhs.fileSize == rhs.fileSize
+      && DateHelper.safeEquals(lhs.importedAt, rhs.importedAt)
+      && lhs.importedFileDir == rhs.importedFileDir
+      && lhs.importedFileName == rhs.importedFileName
+      && lhs.wasCopied == rhs.wasCopied
+  }
+
   func updated(_ from: ExportedFile) -> ExportedFile {
     return self.copy(
       fileSize: from.fileSize,

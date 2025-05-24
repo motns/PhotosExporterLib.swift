@@ -22,7 +22,7 @@ enum AssetLibrary: Int, Sendable, Codable {
   case sharedAlbum = 3
 }
 
-struct ExportedAsset: Codable, Equatable {
+struct ExportedAsset: Codable, Equatable, Hashable {
   let id: String
   let assetType: AssetType
   let assetLibrary: AssetLibrary
@@ -37,12 +37,44 @@ struct ExportedAsset: Codable, Equatable {
   let isDeleted: Bool
   let deletedAt: Date?
 
+  enum CodingKeys: String, CodingKey {
+    case id
+    case assetType = "asset_type_id"
+    case assetLibrary = "asset_library_id"
+    case createdAt = "created_at"
+    case updatedAt = "updated_at"
+    case importedAt = "imported_at"
+    case isFavourite = "is_favourite"
+    case geoLat = "geo_lat"
+    case geoLong = "geo_long"
+    case cityId = "city_id"
+    case countryId = "country_id"
+    case isDeleted = "is_deleted"
+    case deletedAt = "deleted_at"
+  }
+
   func needsUpdate(_ other: ExportedAsset) -> Bool {
     return self.isFavourite != other.isFavourite
       || self.geoLat != other.geoLat
       || self.geoLong != other.geoLong
       || self.cityId != other.cityId
       || self.countryId != other.countryId
+  }
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.id == rhs.id
+      && lhs.assetType == rhs.assetType
+      && lhs.assetLibrary == rhs.assetLibrary
+      && DateHelper.safeEquals(lhs.createdAt, rhs.createdAt)
+      && DateHelper.safeEquals(lhs.updatedAt, rhs.updatedAt)
+      && DateHelper.safeEquals(lhs.importedAt, rhs.importedAt)
+      && lhs.isFavourite == rhs.isFavourite
+      && lhs.geoLat == rhs.geoLat
+      && lhs.geoLong == rhs.geoLong
+      && lhs.cityId == rhs.cityId
+      && lhs.countryId == rhs.countryId
+      && lhs.isDeleted == rhs.isDeleted
+      && DateHelper.safeEquals(lhs.deletedAt, rhs.deletedAt)
   }
 
   func copy(
@@ -88,22 +120,6 @@ struct ExportedAsset: Codable, Equatable {
       isDeleted: false, // Implicitly False, since we're updating from a Photokit Asset
       deletedAt: nil
     )
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case id
-    case assetType = "asset_type_id"
-    case assetLibrary = "asset_library_id"
-    case createdAt = "created_at"
-    case updatedAt = "updated_at"
-    case importedAt = "imported_at"
-    case isFavourite = "is_favourite"
-    case geoLat = "geo_lat"
-    case geoLong = "geo_long"
-    case cityId = "city_id"
-    case countryId = "country_id"
-    case isDeleted = "is_deleted"
-    case deletedAt = "deleted_at"
   }
 
   static func fromPhotokitAsset(

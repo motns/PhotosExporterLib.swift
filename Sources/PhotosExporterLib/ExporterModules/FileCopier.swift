@@ -51,7 +51,9 @@ struct FileCopier {
 
       let copyResult = try await photokit.copyResource(
         assetId: toCopy.assetIds.first!,
-        fileType: toCopy.exportedFile.fileType,
+        resourceType: PhotokitAssetResourceType.fromExporterFileType(
+          fileType: toCopy.exportedFile.fileType
+        ),
         originalFileName: toCopy.exportedFile.originalFileName,
         destination: destinationFileURL
       )

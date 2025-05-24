@@ -2,6 +2,7 @@ import Photos
 
 protocol PhotokitFetchResultProtocol<Element> {
   associatedtype Element
+  var count: Int { get }
   func reset()
   func hasNext() -> Bool
   func next() async throws -> Element?

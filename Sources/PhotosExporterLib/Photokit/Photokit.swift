@@ -9,13 +9,11 @@ protocol PhotokitProtocol {
 
   func getRootFolder() throws -> PhotokitFolder
 
-  func getFolder(folderId: String, parentIdOpt: String?) throws -> PhotokitFolder
-
   func getSharedAlbums() throws -> [PhotokitAlbum]
 
   func copyResource(
     assetId: String,
-    fileType: FileType,
+    resourceType: PhotokitAssetResourceType,
     originalFileName: String,
     destination: URL,
   ) async throws -> ResourceCopyResult
@@ -24,6 +22,7 @@ protocol PhotokitProtocol {
 /*
 Library for abstracting away calls to the Photokit framework
 */
+// swiftlint:disable:next type_body_length
 struct Photokit: PhotokitProtocol {
   private let logger: ClassLogger
 
@@ -73,14 +72,20 @@ struct Photokit: PhotokitProtocol {
     }
   }
 
-  typealias AssetFetchResult = PhotokitFetchResult<PHAsset, PhotokitAsset>
+  func fetchResultToArray<T>(_ res: PHFetchResult<T>) -> [T] {
+    var ls: [T] = []
+    res.enumerateObjects { object, _, _ in
+      ls.append(object)
+    }
+    return ls
+  }
 
   func getAllAssetsResult() async throws -> any AssetFetchResultProtocol {
     let allAssetsFetch = PHFetchOptions()
     allAssetsFetch.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
     // allAssetsFetch.fetchLimit = 25
 
-    var fetchResults = [AssetFetchResult]()
+    var fetchResults = [PhotokitFetchResult<PHAsset, PhotokitAsset>]()
 
     fetchResults.append(PhotokitFetchResult(PHAsset.fetchAssets(with: allAssetsFetch)) { asset in
       if let photokitAsset = try await self.getPhotokitAssetForPHAsset(
@@ -195,7 +200,7 @@ struct Photokit: PhotokitProtocol {
   }
 
   // swiftlint:disable:next function_body_length
-  func getFolder(folderId: String, parentIdOpt: String? = nil) throws -> PhotokitFolder {
+  private func getFolder(folderId: String, parentIdOpt: String? = nil) throws -> PhotokitFolder {
     let folderOpt: PHCollectionList?
     let parentId: String?
 
@@ -303,7 +308,7 @@ struct Photokit: PhotokitProtocol {
 
   func copyResource(
     assetId: String,
-    fileType: FileType,
+    resourceType: PhotokitAssetResourceType,
     originalFileName: String,
     destination: URL,
   ) async throws -> ResourceCopyResult {
@@ -312,9 +317,7 @@ struct Photokit: PhotokitProtocol {
       return ResourceCopyResult.removed
     }
 
-    let assetResourceType = PhotokitAssetResourceType.fromExporterFileType(
-      fileType: fileType
-    ).toPHAssetResourceType()
+    let assetResourceType = resourceType.toPHAssetResourceType()
     var resourceOpt: PHAssetResource?
     for resource in PHAssetResource.assetResources(for: asset) {
       if resource.type == assetResourceType && resource.originalFilename == originalFileName {
@@ -333,14 +336,6 @@ struct Photokit: PhotokitProtocol {
 
     try await PHAssetResourceManager.default().writeData(for: resource, toFile: destination, options: nil)
     return ResourceCopyResult.copied
-  }
-
-  func fetchResultToArray<T>(_ res: PHFetchResult<T>) -> [T] {
-    var ls: [T] = []
-    res.enumerateObjects { object, _, _ in
-      ls.append(object)
-    }
-    return ls
   }
 }
 
