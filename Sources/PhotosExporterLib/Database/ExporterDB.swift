@@ -176,7 +176,7 @@ extension ExporterDB {
   }
 
   func getAllAlbums() throws -> [ExportedAlbum] {
-    return try dbQueue.read{ db in
+    return try dbQueue.read { db in
       try ExportedAlbum.fetchAll(db)
     }
   }

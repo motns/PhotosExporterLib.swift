@@ -5,6 +5,7 @@ import Testing
 @testable import PhotosExporterLib
 
 @Suite("Photos Exporter Lib Tests")
+// swiftlint:disable:next type_body_length
 final class PhotosExporterLibTests {
   let photosExporterLib: PhotosExporterLib
   let exporterDB: ExporterDB
