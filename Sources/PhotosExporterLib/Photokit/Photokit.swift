@@ -188,7 +188,6 @@ struct Photokit: PhotokitProtocol {
       return PhotokitAlbum(
         id: assetCollection.localIdentifier,
         title: title,
-        folderId: Photokit.RootFolderId,
         collectionSubtype: .albumCloudShared,
         assetIds: try self.getAssetIdsForAlbumId(albumId: assetCollection.localIdentifier)
       )
@@ -196,17 +195,14 @@ struct Photokit: PhotokitProtocol {
   }
 
   func getRootFolder() throws -> PhotokitFolder {
-    return try getFolder(folderId: Photokit.RootFolderId, parentIdOpt: nil)
+    return try getFolder(folderId: Photokit.RootFolderId)
   }
 
-  // swiftlint:disable:next function_body_length
-  private func getFolder(folderId: String, parentIdOpt: String? = nil) throws -> PhotokitFolder {
+  private func getFolder(folderId: String) throws -> PhotokitFolder {
     let folderOpt: PHCollectionList?
-    let parentId: String?
 
     if folderId == Photokit.RootFolderId {
       folderOpt = nil
-      parentId = nil
     } else {
       let collectionWithIdOpt = fetchResultToArray(PHCollectionList.fetchCollectionLists(
         withLocalIdentifiers: [folderId], options: nil
@@ -216,12 +212,7 @@ struct Photokit: PhotokitProtocol {
         throw PhotokitError.invalidCollectionListId(folderId)
       }
 
-      guard let pId = parentIdOpt else {
-        throw PhotokitError.missingParentId
-      }
-
       folderOpt = collectionWithId
-      parentId = pId
     }
 
     var subfolders = [PhotokitFolder]()
@@ -244,8 +235,7 @@ struct Photokit: PhotokitProtocol {
       if let subfolder = collection as? PHCollectionList {
         if let title = subfolder.localizedTitle, FileHelper.normaliseForPath(title) != "" {
           subfolders.append(try self.getFolder(
-            folderId: subfolder.localIdentifier,
-            parentIdOpt: folderId
+            folderId: subfolder.localIdentifier
           ))
         }
       } else if let album = collection as? PHAssetCollection {
@@ -253,7 +243,6 @@ struct Photokit: PhotokitProtocol {
           albums.append(PhotokitAlbum(
             id: album.localIdentifier,
             title: title,
-            folderId: folderId,
             collectionSubtype: .albumRegular,
             assetIds: try self.getAssetIdsForAlbumId(albumId: album.localIdentifier),
           ))
@@ -264,7 +253,6 @@ struct Photokit: PhotokitProtocol {
     return PhotokitFolder(
       id: folderId,
       title: folderOpt?.localizedTitle ?? "Untitled",
-      parentId: parentId,
       subfolders: subfolders,
       albums: albums,
     )

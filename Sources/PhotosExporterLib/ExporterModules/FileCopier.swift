@@ -5,6 +5,7 @@ struct FileCopier {
   private let filesDirURL: URL
   private let exporterDB: ExporterDB
   private let photokit: PhotokitProtocol
+  private let fileManager: ExporterFileManagerProtocol
   private let timeProvider: TimeProvider
   private let logger: ClassLogger
 
@@ -12,12 +13,14 @@ struct FileCopier {
     exportBaseDirURL: URL,
     exporterDB: ExporterDB,
     photokit: PhotokitProtocol,
+    fileManager: ExporterFileManagerProtocol,
     timeProvider: TimeProvider,
     logger: Logger,
   ) {
     self.filesDirURL = exportBaseDirURL.appending(path: "files")
     self.exporterDB = exporterDB
     self.photokit = photokit
+    self.fileManager = fileManager
     self.timeProvider = timeProvider
     self.logger = ClassLogger(logger: logger, className: "FileCopier")
   }
@@ -44,7 +47,7 @@ struct FileCopier {
       let destinationDirURL = filesDirURL.appending(path: toCopy.exportedFile.importedFileDir)
       let loggerMetadata: Logger.Metadata = ["id": "\(toCopy.exportedFile.id)"]
 
-      if try FileHelper.createDirectory(path: destinationDirURL.path(percentEncoded: false)) {
+      if try fileManager.createDirectory(path: destinationDirURL.path(percentEncoded: false)) == .success {
         logger.trace("Created destination directory: \(destinationDirURL.path(percentEncoded: false))")
       }
       let destinationFileURL = destinationDirURL.appending(path: toCopy.exportedFile.importedFileName)

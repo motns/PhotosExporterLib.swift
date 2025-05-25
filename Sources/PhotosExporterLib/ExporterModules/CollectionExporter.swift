@@ -27,7 +27,8 @@ struct CollectionExporter {
     let startDate = timeProvider.getDate()
 
     let rootFolderResult = try processPhotokitFolder(
-      folder: try self.photokit.getRootFolder()
+      folder: try self.photokit.getRootFolder(),
+      parentId: nil
     )
 
     var albumInsertedCnt = 0
@@ -38,7 +39,10 @@ struct CollectionExporter {
     let sharedAlbums = try self.photokit.getSharedAlbums()
     for sharedAlbum in sharedAlbums {
       let albumUpsertRes = try self.exporterDB.upsertAlbum(
-        album: ExportedAlbum.fromPhotokitAlbum(album: sharedAlbum)
+        album: ExportedAlbum.fromPhotokitAlbum(
+          album: sharedAlbum,
+          folderId: Photokit.RootFolderId,
+        )
       )
       switch albumUpsertRes {
       case .insert: albumInsertedCnt += 1
@@ -55,7 +59,10 @@ struct CollectionExporter {
     )
   }
 
-  private func processPhotokitFolder(folder: PhotokitFolder) throws -> CollectionExportResult {
+  private func processPhotokitFolder(
+    folder: PhotokitFolder,
+    parentId: String?,
+  ) throws -> CollectionExportResult {
     let loggerMetadata: Logger.Metadata = [
       "folder_id": "\(folder.id)"
     ]
@@ -68,7 +75,10 @@ struct CollectionExporter {
     var albumUpdatedCnt = 0
     var albumUnchangedCnt = 0
 
-    let exportedFolder = ExportedFolder.fromPhotokitFolder(folder: folder)
+    let exportedFolder = ExportedFolder.fromPhotokitFolder(
+      folder: folder,
+      parentId: parentId,
+    )
     let folderUpsertRes = try self.exporterDB.upsertFolder(folder: exportedFolder)
     switch folderUpsertRes {
     case .insert: folderInsertedCnt += 1
@@ -77,7 +87,11 @@ struct CollectionExporter {
     }
 
     for album in folder.albums {
-      let albumUpsertRes = try self.exporterDB.upsertAlbum(album: ExportedAlbum.fromPhotokitAlbum(album: album))
+      let exportedAlbum = try ExportedAlbum.fromPhotokitAlbum(
+        album: album,
+        folderId: folder.id,
+      )
+      let albumUpsertRes = try self.exporterDB.upsertAlbum(album: exportedAlbum)
       switch albumUpsertRes {
       case .insert: albumInsertedCnt += 1
       case .update: albumUpdatedCnt += 1
@@ -86,7 +100,7 @@ struct CollectionExporter {
     }
 
     for subfolder in folder.subfolders {
-      let subfolderRes = try processPhotokitFolder(folder: subfolder)
+      let subfolderRes = try processPhotokitFolder(folder: subfolder, parentId: folder.id)
       folderInsertedCnt += subfolderRes.folderInserted
       folderUpdatedCnt += subfolderRes.folderUpdated
       folderUnchangedCnt += subfolderRes.folderUnchanged

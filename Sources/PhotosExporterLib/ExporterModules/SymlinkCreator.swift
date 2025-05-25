@@ -5,6 +5,7 @@ struct SymlinkCreator {
   private let albumsDirURL: URL
   private let filesDirURL: URL
   private let exporterDB: ExporterDB
+  private let fileManager: ExporterFileManagerProtocol
   private let timeProvider: TimeProvider
   private let logger: ClassLogger
 
@@ -12,12 +13,14 @@ struct SymlinkCreator {
     albumsDirURL: URL,
     filesDirURL: URL,
     exporterDB: ExporterDB,
+    fileManager: ExporterFileManagerProtocol,
     timeProvider: TimeProvider,
     logger: Logger,
   ) {
     self.albumsDirURL = albumsDirURL
     self.filesDirURL = filesDirURL
     self.exporterDB = exporterDB
+    self.fileManager = fileManager
     self.timeProvider = timeProvider
     self.logger = ClassLogger(logger: logger, className: "SymlinkCreator")
   }
@@ -26,10 +29,8 @@ struct SymlinkCreator {
     logger.info("Removing and recreating Album folders...")
     let startDate = timeProvider.getDate()
 
-    if FileManager.default.fileExists(atPath: albumsDirURL.path(percentEncoded: false)) {
-      try FileManager.default.removeItem(atPath: albumsDirURL.path(percentEncoded: false))
-    }
-    _ = try FileHelper.createDirectory(url: albumsDirURL)
+    _ = try fileManager.remove(url: albumsDirURL)
+    _ = try fileManager.createDirectory(url: albumsDirURL)
 
     logger.debug("Creating Album directories and symlinks...")
     try createAlbumFolderSymlinks(
@@ -66,7 +67,7 @@ struct SymlinkCreator {
           "folder_id": "\(subfolder.id)",
           "folder_dir": "\(subfolderDirURL.path(percentEncoded: false))",
         ])
-        _ = try FileHelper.createDirectory(url: subfolderDirURL)
+        _ = try fileManager.createDirectory(url: subfolderDirURL)
 
         try createAlbumFolderSymlinks(
           folderId: subfolder.id,
@@ -94,7 +95,7 @@ struct SymlinkCreator {
           "album_id": "\(album.id)",
           "album_dir": "\(albumDirURL.path(percentEncoded: false))",
         ])
-        _ = try FileHelper.createDirectory(url: albumDirURL)
+        _ = try fileManager.createDirectory(url: albumDirURL)
 
         for file in try exporterDB.getFilesForAlbum(albumId: album.id) {
           let linkSrc = filesDirURL
@@ -103,21 +104,20 @@ struct SymlinkCreator {
 
           let linkDest = albumDirURL.appending(path: file.importedFileName)
 
-          guard !FileManager.default.fileExists(atPath: linkDest.path(percentEncoded: false)) else {
-            logger.trace("Symlink for Album File already exists - skipping", [
+          let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
+          if res == .exists {
+            logger.trace("Symlink for Album File already exists", [
               "album_id": "\(album.id)",
               "link_src": "\(linkSrc.path(percentEncoded: false))",
               "link_dest": "\(linkDest.path(percentEncoded: false))",
             ])
-            continue
+          } else {
+            logger.trace("Created symlink for Album File", [
+              "album_id": "\(album.id)",
+              "link_src": "\(linkSrc.path(percentEncoded: false))",
+              "link_dest": "\(linkDest.path(percentEncoded: false))",
+            ])
           }
-
-          logger.trace("Creating symlink for Album File...", [
-            "album_id": "\(album.id)",
-            "link_src": "\(linkSrc.path(percentEncoded: false))",
-            "link_dest": "\(linkDest.path(percentEncoded: false))",
-          ])
-          try FileManager.default.createSymbolicLink(at: linkDest, withDestinationURL: linkSrc)
         }
       } else {
         logger.warning("Cannot convert Album name to path-safe version - skipping", [

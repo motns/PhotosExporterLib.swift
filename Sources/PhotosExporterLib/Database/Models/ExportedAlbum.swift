@@ -50,7 +50,7 @@ struct ExportedAlbum: Codable, Equatable, Hashable {
     )
   }
 
-  static func fromPhotokitAlbum(album: PhotokitAlbum) throws -> ExportedAlbum {
+  static func fromPhotokitAlbum(album: PhotokitAlbum, folderId: String) throws -> ExportedAlbum {
     let albumType: AlbumType = switch album.collectionSubtype {
     case .albumRegular: .user
     case .albumCloudShared: .shared
@@ -61,7 +61,7 @@ struct ExportedAlbum: Codable, Equatable, Hashable {
     return ExportedAlbum(
       id: album.id,
       albumType: albumType,
-      albumFolderId: album.folderId,
+      albumFolderId: folderId,
       name: album.title,
       assetIds: Set(album.assetIds)
     )

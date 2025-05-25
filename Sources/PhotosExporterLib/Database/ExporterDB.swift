@@ -117,6 +117,12 @@ extension ExporterDB {
     }
   }
 
+  func getAllAssetFiles() throws -> [ExportedAssetFile] {
+    return try dbQueue.read { db in
+      try ExportedAssetFile.fetchAll(db)
+    }
+  }
+
   func getFolder(id: String) throws -> ExportedFolder? {
     logger.debug("Retrieving Folder", [
       "id": "\(id)"
@@ -124,6 +130,12 @@ extension ExporterDB {
 
     return try dbQueue.read { db in
       try ExportedFolder.fetchOne(db, id: id)
+    }
+  }
+
+  func getAllFolders() throws -> [ExportedFolder] {
+    return try dbQueue.read { db in
+      try ExportedFolder.fetchAll(db)
     }
   }
 
@@ -160,6 +172,12 @@ extension ExporterDB {
         sql: "album_folder_id = ?",
         arguments: [folderId]
       ).fetchAll(db)
+    }
+  }
+
+  func getAllAlbums() throws -> [ExportedAlbum] {
+    return try dbQueue.read{ db in
+      try ExportedAlbum.fetchAll(db)
     }
   }
 }

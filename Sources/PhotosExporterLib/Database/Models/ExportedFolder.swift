@@ -34,11 +34,14 @@ struct ExportedFolder: Codable, Equatable, Hashable {
     )
   }
 
-  static func fromPhotokitFolder(folder: PhotokitFolder) -> ExportedFolder {
+  static func fromPhotokitFolder(
+    folder: PhotokitFolder,
+    parentId: String?,
+  ) -> ExportedFolder {
     return ExportedFolder(
       id: folder.id,
       name: folder.title,
-      parentId: folder.parentId
+      parentId: parentId
     )
   }
 }

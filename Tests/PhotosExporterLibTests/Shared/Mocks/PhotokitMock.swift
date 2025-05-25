@@ -5,7 +5,8 @@ class PhotokitMock: PhotokitProtocol {
   var assets: [PhotokitAsset]
   var albums: [PhotokitAlbum]
   var sharedAlbums: [PhotokitAlbum]
-  var rootFolder: PhotokitFolder
+  var rootAlbums: [PhotokitAlbum]
+  var rootFolders: [PhotokitFolder]
 
   public private(set) var copyResourceCalls: [CopyResourceCall]
   var copyResourceResponse: ResourceCopyResult
@@ -14,13 +15,8 @@ class PhotokitMock: PhotokitProtocol {
     self.assets = []
     self.albums = []
     self.sharedAlbums = []
-    self.rootFolder = PhotokitFolder(
-      id: Photokit.RootFolderId,
-      title: "Untitled",
-      parentId: nil,
-      subfolders: [],
-      albums: [],
-    )
+    self.rootAlbums = []
+    self.rootFolders = []
     self.copyResourceCalls = []
     self.copyResourceResponse = .copied
   }
@@ -46,7 +42,12 @@ class PhotokitMock: PhotokitProtocol {
   }
 
   func getRootFolder() throws -> PhotokitFolder {
-    return rootFolder
+    return PhotokitFolder(
+      id: Photokit.RootFolderId,
+      title: "Untitled",
+      subfolders: self.rootFolders,
+      albums: self.rootAlbums,
+    )
   }
 
   func getSharedAlbums() -> [PhotokitAlbum] {

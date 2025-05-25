@@ -34,7 +34,6 @@ enum PhotokitAssetCollectionSubType: Int, Sendable {
 struct PhotokitAlbum: Sendable {
   let id: String
   let title: String
-  let folderId: String
   let collectionSubtype: PhotokitAssetCollectionSubType
   let assetIds: [String]
 }

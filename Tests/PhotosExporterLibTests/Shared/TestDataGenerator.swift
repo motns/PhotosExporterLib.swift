@@ -78,6 +78,7 @@ struct TestDataGenerator {
     createdAt: Date? = nil,
     updatedAt: Date? = nil,
     importedAt: Date? = nil,
+    isFavourite: Bool? = nil,
     city: String? = nil,
     country: String? = nil,
   ) throws -> ExportedAsset {
@@ -112,9 +113,9 @@ struct TestDataGenerator {
       createdAt: actualCreatedAt,
       updatedAt: updatedAt ?? randomUpdatedAt,
       importedAt: importedAt ?? randomImportedAt,
-      isFavourite: false,
-      geoLat: 51.507861,
-      geoLong: -0.160310,
+      isFavourite: isFavourite ?? Bool.random(),
+      geoLat: Double.random(in: -90...90),
+      geoLong: Double.random(in: -180...180),
       cityId: cityId,
       countryId: countryId,
       isDeleted: false,
@@ -175,5 +176,33 @@ struct TestDataGenerator {
     let file = try insertFile(asset: asset)
     let assetFile = try insertAssetFile(asset: asset, file: file)
     return (asset, file, assetFile)
+  }
+
+  func createPhotokitFolder(
+    id: String? = nil,
+    title: String? = nil,
+    subfolders: [PhotokitFolder]? = nil,
+    albums: [PhotokitAlbum]? = nil,
+  ) -> PhotokitFolder {
+    return PhotokitFolder(
+      id: id ?? UUID().uuidString,
+      title: title ?? "My Folder \(Int.random(in: 1...999999))",
+      subfolders: subfolders ?? [],
+      albums: albums ?? [],
+    )
+  }
+
+  func createPhotokitAlbum(
+    id: String? = nil,
+    title: String? = nil,
+    collectionSubtype: PhotokitAssetCollectionSubType? = nil,
+    assetIds: [String]? = nil,
+  ) -> PhotokitAlbum {
+    return PhotokitAlbum(
+      id: id ?? UUID().uuidString,
+      title: title ?? "My Album \(Int.random(in: 1...999999))",
+      collectionSubtype: .albumRegular,
+      assetIds: assetIds ?? [],
+    )
   }
 }

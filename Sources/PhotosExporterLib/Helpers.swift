@@ -55,31 +55,6 @@ struct FileHelper {
               .replacingOccurrences(of: "[^\\w\\d]+", with: "", options: .regularExpression)
               .lowercased()
   }
-
-  public static func createDirectory(url: URL) throws -> Bool {
-    return try createDirectory(path: url.path(percentEncoded: false))
-  }
-
-  public static func createDirectory(path: String) throws -> Bool {
-    var isDirectory: ObjCBool = false
-    if FileManager.default.fileExists(
-      atPath: path,
-      isDirectory: &isDirectory
-    ) && !isDirectory.boolValue {
-      throw FileHelperError.fileExistsAtDirectoryPath(path)
-    }
-
-    guard !FileManager.default.fileExists(atPath: path) else {
-      return false
-    }
-
-    try FileManager.default.createDirectory(
-      atPath: path,
-      withIntermediateDirectories: true,
-      attributes: nil
-    )
-    return true
-  }
 }
 
 struct DateHelper {

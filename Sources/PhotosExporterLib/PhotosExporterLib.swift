@@ -8,6 +8,7 @@ public struct PhotosExporterLib {
   private let filesDirURL: URL
   private let photokit: PhotokitProtocol
   private let exporterDB: ExporterDB
+  private let fileManager: ExporterFileManagerProtocol
   private let logger: ClassLogger
   private let timeProvider: TimeProvider
 
@@ -21,6 +22,7 @@ public struct PhotosExporterLib {
     photokit: PhotokitProtocol,
     exporterDB: ExporterDB,
     photosDB: PhotosDBProtocol,
+    fileManager: ExporterFileManagerProtocol,
     logger: Logger,
     timeProvider: TimeProvider
   ) {
@@ -29,6 +31,7 @@ public struct PhotosExporterLib {
     self.filesDirURL = exportBaseDirURL.appending(path: "files")
     self.photokit = photokit
     self.exporterDB = exporterDB
+    self.fileManager = fileManager
     self.logger = ClassLogger(logger: logger, className: "PhotosExporterLib")
     self.timeProvider = timeProvider
 
@@ -51,6 +54,7 @@ public struct PhotosExporterLib {
       exportBaseDirURL: self.exportBaseDirURL,
       exporterDB: exporterDB,
       photokit: photokit,
+      fileManager: self.fileManager,
       timeProvider: timeProvider,
       logger: logger,
     )
@@ -59,6 +63,7 @@ public struct PhotosExporterLib {
       albumsDirURL: self.albumsDirURL,
       filesDirURL: self.filesDirURL,
       exporterDB: exporterDB,
+      fileManager: fileManager,
       timeProvider: timeProvider,
       logger: logger,
     )
@@ -67,7 +72,6 @@ public struct PhotosExporterLib {
   init(
     exportBaseDir: String,
     loggerOpt: Logger? = nil,
-    timeProviderOpt: TimeProvider? = nil
   ) async throws {
     let logger: Logger
 
@@ -83,10 +87,10 @@ public struct PhotosExporterLib {
 
     do {
       classLogger.info("Creating export folder...")
-      if try FileHelper.createDirectory(path: exportBaseDir) {
-        classLogger.trace("Export folder created")
-      } else {
+      if try ExporterFileManager.shared.createDirectory(path: exportBaseDir) == .exists {
         classLogger.trace("Export folder already exists")
+      } else {
+        classLogger.trace("Export folder created")
       }
 
       try PhotosExporterLib.copyPhotosDB(exportBaseDir: exportBaseDir, logger: classLogger)
@@ -103,8 +107,9 @@ public struct PhotosExporterLib {
         logger: logger,
       ),
       photosDB: try PhotosDB(photosDBPath: "\(exportBaseDir)/Photos.sqlite", logger: logger),
+      fileManager: ExporterFileManager.shared,
       logger: logger,
-      timeProvider: timeProviderOpt ?? DefaultTimeProvider.shared,
+      timeProvider: DefaultTimeProvider.shared,
     )
   }
 
