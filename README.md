@@ -1,5 +1,7 @@
 # Photos Exporter Library
 
+[![PhotosExporterLib CI](https://github.com/motns/PhotosExporterLib.swift/actions/workflows/CI.yml/badge.svg)](https://github.com/motns/PhotosExporterLib.swift/actions/workflows/CI.yml)
+
 A Swift Library used to replicate the local Apple Photos library on MacOS into a target folder by:
 * Mirroring Assets, Resources, Albums and Folders into a SQLite database in the export folder
 * Copying all Resources into the export folder, organised by date and location (where available)
