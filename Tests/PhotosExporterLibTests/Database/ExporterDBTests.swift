@@ -207,7 +207,9 @@ final class ExporterDBTests {
 
   @Test("Upsert Asset - Update")
   func upsertAssetUpdate() throws {
-    let asset = try dataGen.createExportedAsset()
+    let asset = try dataGen.createExportedAsset(
+      isFavourite: false
+    )
 
     let insertRes = try self.exporterDB.upsertAsset(asset: asset)
     #expect(insertRes == UpsertResult.insert)
