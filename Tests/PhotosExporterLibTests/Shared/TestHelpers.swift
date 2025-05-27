@@ -32,3 +32,10 @@ struct TestHelpers {
     return testDir
   }
 }
+
+struct StringHelper {
+  static func indent(_ str: String, _ spaces: Int = 2) -> String {
+    let indentation = String(repeating: " ", count: spaces)
+    return str.split(separator: "\n").joined(separator: "\n\(indentation)")
+  }
+}
