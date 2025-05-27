@@ -33,6 +33,30 @@ struct PhotokitAsset: Sendable {
     String(id.split(separator: "/").first!)
   }
 
+  func copy(
+    id: String? = nil,
+    assetMediaType: PhotokitAssetMediaType? = nil,
+    assetLibrary: AssetLibrary? = nil,
+    createdAt: Date?? = nil,
+    updatedAt: Date?? = nil,
+    isFavourite: Bool? = nil,
+    geoLat: Double?? = nil,
+    geoLong: Double?? = nil,
+    resources: [PhotokitAssetResource]? = nil
+  ) -> PhotokitAsset {
+    PhotokitAsset(
+      id: id ?? self.id,
+      assetMediaType: assetMediaType ?? self.assetMediaType,
+      assetLibrary: assetLibrary ?? self.assetLibrary,
+      createdAt: createdAt ?? self.createdAt,
+      updatedAt: updatedAt ?? self.updatedAt,
+      isFavourite: isFavourite ?? self.isFavourite,
+      geoLat: geoLat ?? self.geoLat,
+      geoLong: geoLong ?? self.geoLong,
+      resources: resources ?? self.resources,
+    )
+  }
+
   static func fromPHAsset(
     asset: PHAsset,
     library: AssetLibrary,

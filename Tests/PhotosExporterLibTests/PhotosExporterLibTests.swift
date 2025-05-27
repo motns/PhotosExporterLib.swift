@@ -5,6 +5,7 @@ import Testing
 @testable import PhotosExporterLib
 
 @Suite("Photos Exporter Lib Tests")
+// swiftlint:disable file_length
 // swiftlint:disable:next type_body_length
 final class PhotosExporterLibTests {
   let photosExporterLib: PhotosExporterLib
@@ -57,12 +58,12 @@ final class PhotosExporterLibTests {
   // swiftlint:disable:next function_body_length
   func exportIntoEmptyDB() async throws {
     // - MARK: Set up test data
-    let now = timeProvider.getDate()
+    let now = timeProvider.freezeTime().getDate()
     let exportBaseDirURL = URL(filePath: testDir)
 
-    let resource1 = dataGen.createPhotokitAssertResource()
-    let resource2 = dataGen.createPhotokitAssertResource()
-    let resource3 = dataGen.createPhotokitAssertResource()
+    let resource1 = dataGen.createPhotokitAssetResource()
+    let resource2 = dataGen.createPhotokitAssetResource()
+    let resource3 = dataGen.createPhotokitAssetResource()
 
     let asset1 = try dataGen.createPhotokitAsset(
       assetId: "E5481A99-EF62-41D4-B438-F878186E5903",
@@ -238,8 +239,11 @@ final class PhotosExporterLibTests {
     )
 
     // - MARK: Initial run
-    let initialRes = try await self.photosExporterLib.export()
-    #expect(initialRes == expectedInitialRes)
+    let initialRes = try await photosExporterLib.export()
+    #expect(
+      initialRes == expectedInitialRes,
+      "\(initialRes.getDiffAsString(expectedInitialRes) ?? "")"
+    )
 
     let fileDirURL = exportBaseDirURL.appending(path: "files")
     let expectedCopyCalls = [
@@ -368,9 +372,123 @@ final class PhotosExporterLibTests {
       ),
       fileCopy: FileCopyResult(copied: 0, removed: 0)
     )
-    let noChangeRes = try await self.photosExporterLib.export()
-    #expect(noChangeRes == expectedNoChangeRes)
+    let noChangeRes = try await photosExporterLib.export()
+    #expect(
+      noChangeRes == expectedNoChangeRes,
+      "\(noChangeRes.getDiffAsString(expectedNoChangeRes) ?? "")"
+    )
     // Make sure no new file copy calls have happened
     #expect(photokitMock.copyResourceCalls.count == 3)
+
+    // - MARK: Update run
+    let updatedAsset1 = asset1.copy(
+      isFavourite: !asset1.isFavourite
+    )
+    self.photokitMock.assets = [updatedAsset1, asset2, asset3]
+
+    self.photosDBMock.assetLocations = [
+      asset1.id: dataGen.createPostalAddress(country: "United Kingdom", city: "London"),
+      asset2.id: dataGen.createPostalAddress(country: "Hungary", city: "Budapest"),
+    ]
+
+    let updatedAlbum1 = album1.copy(
+      assetIds: [asset1.id, asset2.id]
+    )
+    self.photokitMock.rootAlbums = [updatedAlbum1]
+    self.photokitMock.albums = [updatedAlbum1, album2, album3]
+
+    let updatedExportedAsset1 = ExportedAsset.fromPhotokitAsset(
+      asset: updatedAsset1,
+      cityId: try cityLookup.getIdByName(name: "London"),
+      countryId: try countryLookup.getIdByName(name: "United Kingdom"),
+      now: now,
+    )!
+
+    let updatedExportedAsset2 = ExportedAsset.fromPhotokitAsset(
+      asset: asset2,
+      cityId: try cityLookup.getIdByName(name: "Budapest"),
+      countryId: try countryLookup.getIdByName(name: "Hungary"),
+      now: now,
+    )!
+    let updatedExportedFile2 = ExportedFile.fromPhotokitAssetResource(
+      asset: asset2,
+      resource: asset2.resources[0],
+      countryOpt: "Hungary",
+      cityOpt: "Budapest",
+      now: now,
+    )!.copy(wasCopied: true)
+
+    let updatedExportedAlbum1 = try ExportedAlbum.fromPhotokitAlbum(
+      album: updatedAlbum1,
+      folderId: Photokit.RootFolderId,
+    )
+
+    let updatedExportedAssets = [
+      updatedExportedAsset1,
+      updatedExportedAsset2,
+      exportedAsset3,
+    ].sorted(by: { $0.id < $1.id })
+    let updatedExportedFiles = [
+      exportedFile1,
+      updatedExportedFile2,
+      exportedFile3,
+    ].sorted(by: { $0.id < $1.id })
+    let updatedExportedAlbums = [
+      updatedExportedAlbum1,
+      exportedAlbum2,
+      exportedAlbum3,
+    ].sorted(by: { $0.id < $1.id })
+
+    let expectedUpdateRes = ExportResult(
+      assetExport: AssetExportResult(
+        assetInserted: 0,
+        assetUpdated: 2,
+        assetUnchanged: 1,
+        assetSkipped: 0,
+        fileInserted: 0,
+        fileUpdated: 1,
+        fileUnchanged: 2,
+        fileSkipped: 0
+      ),
+      collectionExport: CollectionExportResult(
+        folderInserted: 0,
+        folderUpdated: 0,
+        folderUnchanged: 3,
+        albumInserted: 0,
+        albumUpdated: 1,
+        albumUnchanged: 2
+      ),
+      fileCopy: FileCopyResult(copied: 1, removed: 0)
+    )
+    let updateRes = try await photosExporterLib.export()
+    #expect(
+      updateRes == expectedUpdateRes,
+      "\(updateRes.getDiffAsString(expectedUpdateRes) ?? "")"
+    )
+
+    let updatedAssetsInDB = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
+    #expect(
+      updatedAssetsInDB == updatedExportedAssets,
+      "\(Diff.getDiffAsString(updatedAssetsInDB, updatedExportedAssets) ?? "")"
+    )
+
+    let updatedFilesInDB = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
+    #expect(
+      updatedFilesInDB == updatedExportedFiles,
+      "\(Diff.getDiffAsString(updatedFilesInDB, updatedExportedFiles) ?? "")"
+    )
+
+    // Should be unchanged
+    let assetFilesInDB2 = try exporterDB.getAllAssetFiles().sorted(by: { $0.assetId < $1.assetId })
+    #expect(
+      assetFilesInDB2 == assetFiles,
+      "\(Diff.getDiffAsString(assetFilesInDB2, assetFiles) ?? "")"
+    )
+
+    let updatedAlbumsInDB = try exporterDB.getAllAlbums().sorted(by: { $0.id < $1.id })
+    #expect(
+      updatedAlbumsInDB == updatedExportedAlbums,
+      "\(Diff.getDiffAsString(updatedAlbumsInDB, updatedExportedAlbums) ?? "")"
+    )
   }
 }

@@ -25,7 +25,7 @@ struct TestDataGenerator {
     )
   }
 
-  func createPhotokitAssertResource(
+  func createPhotokitAssetResource(
     assetResourceType: PhotokitAssetResourceType? = nil,
   ) -> PhotokitAssetResource {
     return PhotokitAssetResource(
@@ -56,7 +56,7 @@ struct TestDataGenerator {
 
     var randomResources = [PhotokitAssetResource]()
     for _ in 0...Int.random(in: 1...3) {
-      randomResources.append(createPhotokitAssertResource())
+      randomResources.append(createPhotokitAssetResource())
     }
 
     return PhotokitAsset(

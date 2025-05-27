@@ -37,16 +37,16 @@ struct ExportedAlbum: Codable, Equatable, Hashable {
   }
 
   func needsUpdate(_ other: ExportedAlbum) -> Bool {
-    return self.name != other.name ||
-      self.albumFolderId != other.albumFolderId ||
-      self.assetIds != other.assetIds
+    return self.name != other.name
+      || self.albumFolderId != other.albumFolderId
+      || self.assetIds != other.assetIds
   }
 
   func updated(_ other: ExportedAlbum) -> ExportedAlbum {
     return self.copy(
       albumFolderId: other.albumFolderId,
       name: other.name,
-      assetIds: other.assetIds
+      assetIds: other.assetIds,
     )
   }
 
@@ -63,7 +63,7 @@ struct ExportedAlbum: Codable, Equatable, Hashable {
       albumType: albumType,
       albumFolderId: folderId,
       name: album.title,
-      assetIds: Set(album.assetIds)
+      assetIds: Set(album.assetIds),
     )
   }
 }

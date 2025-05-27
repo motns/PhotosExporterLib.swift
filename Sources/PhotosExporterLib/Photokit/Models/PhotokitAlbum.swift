@@ -36,4 +36,18 @@ struct PhotokitAlbum: Sendable {
   let title: String
   let collectionSubtype: PhotokitAssetCollectionSubType
   let assetIds: [String]
+
+  func copy(
+    id: String? = nil,
+    title: String? = nil,
+    collectionSubtype: PhotokitAssetCollectionSubType? = nil,
+    assetIds: [String]? = nil,
+  ) -> PhotokitAlbum {
+    return PhotokitAlbum(
+      id: id ?? self.id,
+      title: title ?? self.title,
+      collectionSubtype: collectionSubtype ?? self.collectionSubtype,
+      assetIds: assetIds ?? self.assetIds,
+    )
+  }
 }

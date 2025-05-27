@@ -55,11 +55,23 @@ struct ExportedFile: Codable, Equatable, Hashable {
   }
 
   func needsUpdate(_ other: ExportedFile) -> Bool {
+    let newWasCopied: Bool
+    if self.importedFileDir != other.importedFileDir
+    || self.importedFileName != other.importedFileName {
+      // The output location changed, so the file needs to
+      // be copied again
+      newWasCopied = false
+    } else {
+      // Otherwise it shouldn't normally be possible to
+      // unset the "copied" flag
+      newWasCopied = self.wasCopied || other.wasCopied
+    }
+
     return self.importedFileDir != other.importedFileDir
       || self.importedFileName != other.importedFileName
       || self.fileSize != other.fileSize
       // It shouldn't be possible to unset the "copied" flag
-      || (!self.wasCopied && other.wasCopied)
+      || self.wasCopied != newWasCopied
   }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
@@ -74,12 +86,24 @@ struct ExportedFile: Codable, Equatable, Hashable {
   }
 
   func updated(_ from: ExportedFile) -> ExportedFile {
+    let newWasCopied: Bool
+    if self.importedFileDir != from.importedFileDir
+    || self.importedFileName != from.importedFileName {
+      // The output location changed, so the file needs to
+      // be copied again
+      newWasCopied = false
+    } else {
+      // Otherwise it shouldn't normally be possible to
+      // unset the "copied" flag
+      newWasCopied = self.wasCopied || from.wasCopied
+    }
+
     return self.copy(
       fileSize: from.fileSize,
       importedFileDir: from.importedFileDir,
       importedFileName: from.importedFileName,
       // It shouldn't normally be possible to unset the "copied" flag
-      wasCopied: self.wasCopied || from.wasCopied,
+      wasCopied: newWasCopied,
     )
   }
 
