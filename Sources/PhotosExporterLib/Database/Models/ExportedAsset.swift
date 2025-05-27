@@ -109,9 +109,9 @@ struct ExportedAsset: Codable, Equatable, Hashable {
     )
   }
 
-  func updated(from: ExportedAsset, now: Date) -> ExportedAsset {
+  func updated(from: ExportedAsset) -> ExportedAsset {
     return self.copy(
-      updatedAt: now,
+      updatedAt: from.updatedAt,
       isFavourite: from.isFavourite,
       geoLat: from.geoLat,
       geoLong: from.geoLong,

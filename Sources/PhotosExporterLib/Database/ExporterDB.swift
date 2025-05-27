@@ -276,7 +276,7 @@ extension ExporterDB {
         }
 
         logger.trace("Asset changed - updating...", loggerMetadata)
-        try curr.updated(from: asset, now: now ?? Date()).update(db)
+        try curr.updated(from: asset).update(db)
 
         logger.trace("Asset updated", [
           "asset_id": "\(asset.id)",
@@ -314,13 +314,15 @@ extension ExporterDB {
         }
 
         logger.trace("File changed - updating...", loggerMetadata)
+        let updated = curr.updated(file)
         try curr.updated(file).update(db)
 
         logger.trace("File updated", [
-          "id": "\(file.id)",
-          "imported_file_dir": "\(file.importedFileDir)",
-          "imported_file_name": "\(file.importedFileName)",
-          "was_copied": "\(file.wasCopied)",
+          "id": "\(updated.id)",
+          "imported_file_dir": "\(updated.importedFileDir)",
+          "imported_file_name": "\(updated.importedFileName)",
+          "file_size": "\(updated.fileSize)",
+          "was_copied": "\(updated.wasCopied)",
         ])
 
         return UpsertResult.update
