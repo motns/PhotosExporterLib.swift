@@ -270,8 +270,13 @@ final class PhotosExporterLibTests {
             .appending(path: exportedFile3.importedFileDir)
             .appending(path: exportedFile3.importedFileName),
       ),
-    ]
-    #expect(Set(self.photokitMock.copyResourceCalls) == Set(expectedCopyCalls))
+    ].sorted(by: { $0.assetId < $1.assetId })
+    let sortedMockCopyCalls = self.photokitMock.copyResourceCalls
+      .sorted(by: { $0.assetId < $1.assetId })
+    #expect(
+      sortedMockCopyCalls == expectedCopyCalls,
+      "\(Diff.getDiffAsString(sortedMockCopyCalls, expectedCopyCalls) ?? "")"
+    )
 
     let albumDirURL = exportBaseDirURL.appending(path: "albums")
     let expectedSymlinkCalls = [
@@ -302,24 +307,44 @@ final class PhotosExporterLibTests {
           .appending(path: FileHelper.normaliseForPath(exportedAlbum3.name))
           .appending(path: exportedFile3.importedFileName),
       ),
-    ]
-    #expect(Set(fileManagerMock.createSymlinkCalls) == Set(expectedSymlinkCalls))
+    ].sorted(by: { $0.src.absoluteString < $1.src.absoluteString })
+    let sortedMockSymlinkCalls = fileManagerMock
+      .createSymlinkCalls.sorted(by: { $0.src.absoluteString < $1.src.absoluteString })
+    #expect(
+      sortedMockSymlinkCalls == expectedSymlinkCalls,
+      "\(Diff.getDiffAsString(sortedMockSymlinkCalls, expectedSymlinkCalls) ?? "")"
+    )
 
     let assetsInDB = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
     // Avoid using Sets, because they use Hashable instead of Comparable
-    #expect(assetsInDB == exportedAssets)
+    #expect(
+      assetsInDB == exportedAssets,
+      "\(Diff.getDiffAsString(assetsInDB, exportedAssets) ?? "")"
+    )
 
     let filesInDB = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
-    #expect(filesInDB == exportedFiles)
+    #expect(
+      filesInDB == exportedFiles,
+      "\(Diff.getDiffAsString(filesInDB, exportedFiles) ?? "")"
+    )
 
     let assetFilesInDB = try exporterDB.getAllAssetFiles().sorted(by: { $0.assetId < $1.assetId })
-    #expect(assetFilesInDB == assetFiles)
+    #expect(
+      assetFilesInDB == assetFiles,
+      "\(Diff.getDiffAsString(assetFilesInDB, assetFiles) ?? "")"
+    )
 
     let foldersInDB = try exporterDB.getAllFolders().sorted(by: { $0.id < $1.id })
-    #expect(foldersInDB == exportedFolders)
+    #expect(
+      foldersInDB == exportedFolders,
+      "\(Diff.getDiffAsString(foldersInDB, exportedFolders) ?? "")"
+    )
 
     let albumsInDB = try exporterDB.getAllAlbums().sorted(by: { $0.id < $1.id })
-    #expect(albumsInDB == exportedAlbums)
+    #expect(
+      albumsInDB == exportedAlbums,
+      "\(Diff.getDiffAsString(albumsInDB, exportedAlbums) ?? "")"
+    )
 
     // - MARK: No change run
     let expectedNoChangeRes = ExportResult(
