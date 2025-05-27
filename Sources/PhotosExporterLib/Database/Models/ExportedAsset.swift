@@ -54,7 +54,8 @@ struct ExportedAsset: Codable, Equatable, Hashable {
   }
 
   func needsUpdate(_ other: ExportedAsset) -> Bool {
-    return self.isFavourite != other.isFavourite
+    return !DateHelper.safeEquals(self.updatedAt, other.updatedAt)
+      || self.isFavourite != other.isFavourite
       || self.geoLat != other.geoLat
       || self.geoLong != other.geoLong
       || self.cityId != other.cityId

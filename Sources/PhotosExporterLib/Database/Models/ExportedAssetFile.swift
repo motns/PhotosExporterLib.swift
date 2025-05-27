@@ -16,7 +16,7 @@ struct ExportedAssetFile: Codable, Equatable {
 
   func needsUpdate(_ other: ExportedAssetFile) -> Bool {
     return self.isDeleted != other.isDeleted
-      || self.deletedAt != other.deletedAt
+      || !DateHelper.safeEquals(self.deletedAt, other.deletedAt)
   }
 
   func updated(_ from: ExportedAssetFile) -> ExportedAssetFile {
