@@ -14,7 +14,7 @@ public struct PhotosExporterLib {
 
   private let assetExporter: AssetExporter
   private let collectionExporter: CollectionExporter
-  private let fileCopier: FileCopier
+  private let fileExporter: FileExporter
   private let symlinkCreator: SymlinkCreator
 
   internal init(
@@ -24,7 +24,8 @@ public struct PhotosExporterLib {
     photosDB: PhotosDBProtocol,
     fileManager: ExporterFileManagerProtocol,
     logger: Logger,
-    timeProvider: TimeProvider
+    timeProvider: TimeProvider,
+    expiryDays: Int = 30,
   ) {
     self.exportBaseDirURL = URL(filePath: exportBaseDir)
     self.albumsDirURL = exportBaseDirURL.appending(path: "albums")
@@ -41,6 +42,7 @@ public struct PhotosExporterLib {
       photokit: photokit,
       logger: logger,
       timeProvider: timeProvider,
+      expiryDays: expiryDays,
     )
 
     self.collectionExporter = CollectionExporter(
@@ -50,7 +52,7 @@ public struct PhotosExporterLib {
       logger: logger,
     )
 
-    self.fileCopier = FileCopier(
+    self.fileExporter = FileExporter(
       exportBaseDirURL: self.exportBaseDirURL,
       exporterDB: exporterDB,
       photokit: photokit,
@@ -71,19 +73,20 @@ public struct PhotosExporterLib {
 
   init(
     exportBaseDir: String,
-    loggerOpt: Logger? = nil,
+    logger: Logger? = nil,
+    expiryDays: Int = 30,
   ) async throws {
-    let logger: Logger
+    let loggerActual: Logger
 
-    if let customLogger = loggerOpt {
-      logger = customLogger
+    if let customLogger = logger {
+      loggerActual = customLogger
     } else {
       var defaultLogger = Logger(label: "io.motns.PhotosExporter")
       defaultLogger.logLevel = .info
-      logger = defaultLogger
+      loggerActual = defaultLogger
     }
 
-    let classLogger = ClassLogger(logger: logger, className: "PhotosExporterLib")
+    let classLogger = ClassLogger(logger: loggerActual, className: "PhotosExporterLib")
 
     do {
       classLogger.info("Creating export folder...")
@@ -101,15 +104,16 @@ public struct PhotosExporterLib {
 
     self.init(
       exportBaseDir: exportBaseDir,
-      photokit: try await Photokit(logger: logger),
+      photokit: try await Photokit(logger: loggerActual),
       exporterDB: try ExporterDB(
         exportDBPath: "\(exportBaseDir)/export.sqlite",
-        logger: logger,
+        logger: loggerActual,
       ),
-      photosDB: try PhotosDB(photosDBPath: "\(exportBaseDir)/Photos.sqlite", logger: logger),
+      photosDB: try PhotosDB(photosDBPath: "\(exportBaseDir)/Photos.sqlite", logger: loggerActual),
       fileManager: ExporterFileManager.shared,
-      logger: logger,
+      logger: loggerActual,
       timeProvider: DefaultTimeProvider.shared,
+      expiryDays: expiryDays,
     )
   }
 
@@ -163,21 +167,24 @@ public struct PhotosExporterLib {
   public func export(
     assetExportEnabled: Bool = true,
     collectionExportEnabled: Bool = true,
-    fileCopyEnabled: Bool = true,
+    fileManagerEnabled: Bool = true,
+    symlinkCreatorEnabled: Bool = true,
   ) async throws -> ExportResult {
     logger.info("Running Export...")
     let startDate = timeProvider.getDate()
 
     let exportAssetResult = try await assetExporter.export(isEnabled: assetExportEnabled)
     let albumExportResult = try collectionExporter.export(isEnabled: collectionExportEnabled)
-    let copyResults = try await fileCopier.copy(isEnabled: fileCopyEnabled)
-    try symlinkCreator.create()
+    let fileManagerResult = try await fileExporter.run(isEnabled: fileManagerEnabled)
+    try symlinkCreator.create(isEnabled: symlinkCreatorEnabled)
 
     logger.info("Export complete in \(timeProvider.secondsPassedSince(startDate))s")
     return ExportResult(
-      assetExport: exportAssetResult,
+      assetExport: exportAssetResult.copy(
+        fileMarkedForDeletion: exportAssetResult.fileMarkedForDeletion + fileManagerResult.fileMarkedForDeletion
+      ),
       collectionExport: albumExportResult,
-      fileCopy: copyResults,
+      fileExport: fileManagerResult.result,
     )
   }
 }
@@ -192,13 +199,13 @@ public enum PhotosExporterError: Error {
 public struct ExportResult: Sendable, Equatable {
   let assetExport: AssetExportResult
   let collectionExport: CollectionExportResult
-  let fileCopy: FileCopyResult
+  let fileExport: FileExportResult
 
   static func empty() -> ExportResult {
     return ExportResult(
       assetExport: AssetExportResult.empty(),
       collectionExport: CollectionExportResult.empty(),
-      fileCopy: FileCopyResult.empty()
+      fileExport: FileExportResult.empty()
     )
   }
 }

@@ -1,7 +1,7 @@
 import Foundation
 import Logging
 
-struct FileCopier {
+struct FileExporter {
   private let filesDirURL: URL
   private let exporterDB: ExporterDB
   private let photokit: PhotokitProtocol
@@ -25,24 +25,37 @@ struct FileCopier {
     self.logger = ClassLogger(logger: logger, className: "FileCopier")
   }
 
-  func copy(isEnabled: Bool = false) async throws -> FileCopyResult {
+  func run(isEnabled: Bool = false) async throws -> FileExportResultWithRemoved {
     guard isEnabled else {
-      logger.warning("File copying disabled - skipping")
-      return FileCopyResult.empty()
+      logger.warning("File copying and deletion disabled - skipping")
+      return FileExportResultWithRemoved.empty()
     }
     let startDate = timeProvider.getDate()
+    let copyRes = try await copy()
+    let deletedCnt = try delete()
 
+    logger.info("File copying and deletion complete in \(timeProvider.secondsPassedSince(startDate))s")
+    return FileExportResultWithRemoved(
+      result: FileExportResult(
+        copied: copyRes.result.copied,
+        deleted: deletedCnt,
+      ),
+      fileMarkedForDeletion: copyRes.fileMarkedForDeletion
+    )
+  }
+
+  private func copy() async throws -> FileExportResultWithRemoved {
     logger.info("Getting Files to copy from local DB...")
     let filesWithAssetIdToCopy = try exporterDB.getFilesWithAssetIdsToCopy()
 
     guard filesWithAssetIdToCopy.count > 0 else {
       logger.info("No Files to copy")
-      return FileCopyResult(copied: 0, removed: 0)
+      return FileExportResultWithRemoved.empty()
     }
 
     logger.info("Copying files...")
-    var copiedCount = 0
-    var removedCount = 0
+    var copiedCnt = 0
+    var markedForDeletionCnt = 0
     for toCopy in filesWithAssetIdToCopy {
       let destinationDirURL = filesDirURL.appending(path: toCopy.exportedFile.importedFileDir)
       let loggerMetadata: Logger.Metadata = ["id": "\(toCopy.exportedFile.id)"]
@@ -68,26 +81,70 @@ struct FileCopier {
       switch copyResult {
       case .removed:
         logger.trace("File removed in Photos - marking link as deleted in DB...", loggerMetadata)
-        removedCount += 1
+        markedForDeletionCnt += 1
         _ = try exporterDB.markFileAsDeleted(id: toCopy.exportedFile.id, now: timeProvider.getDate())
       case .exists, .copied:
         logger.trace("File successfully copied - updating DB...", loggerMetadata)
-        copiedCount += 1
+        copiedCnt += 1
         _ = try exporterDB.markFileAsCopied(id: toCopy.exportedFile.id)
       }
       logger.trace("File updated in DB", loggerMetadata)
     }
 
-    logger.info("File copying complete in \(timeProvider.secondsPassedSince(startDate))s")
-    return FileCopyResult(copied: copiedCount, removed: removedCount)
+    return FileExportResultWithRemoved(
+      result: FileExportResult(copied: copiedCnt, deleted: 0),
+      fileMarkedForDeletion: markedForDeletionCnt,
+    )
+  }
+
+  private func delete() throws -> Int {
+    logger.debug("Checking for orphaned Files to delete...")
+    let orphanedFiles = try exporterDB.getOrphanedFiles()
+
+    guard !orphanedFiles.isEmpty else {
+      logger.debug("No orphaned files to delete")
+      return 0
+    }
+    logger.debug("Found \(orphanedFiles.count) orphaned Files to delete...")
+
+    for file in orphanedFiles {
+      let fileUrl = filesDirURL
+        .appending(path: file.importedFileDir)
+        .appending(path: file.importedFileName)
+
+      let logMetadata: Logger.Metadata = [
+        "id": "\(file.id)",
+        "path": "\(fileUrl.absoluteString)",
+      ]
+
+      logger.debug("Deleting underlying file for Exported File...", logMetadata)
+      _ = try fileManager.remove(url: fileUrl)
+
+      logger.debug("Deleting Exported File from DB...", logMetadata)
+      _ = try exporterDB.deleteFile(id: file.id)
+    }
+
+    return orphanedFiles.count
   }
 }
 
-public struct FileCopyResult: Sendable, Equatable {
+public struct FileExportResult: Sendable, Equatable {
   let copied: Int
-  let removed: Int
+  let deleted: Int
 
-  static func empty() -> FileCopyResult {
-    return FileCopyResult(copied: 0, removed: 0)
+  static func empty() -> FileExportResult {
+    return FileExportResult(copied: 0, deleted: 0)
+  }
+}
+
+struct FileExportResultWithRemoved {
+  let result: FileExportResult
+  let fileMarkedForDeletion: Int
+
+  static func empty() -> FileExportResultWithRemoved {
+    return FileExportResultWithRemoved(
+      result: FileExportResult.empty(),
+      fileMarkedForDeletion: 0,
+    )
   }
 }

@@ -25,7 +25,12 @@ struct SymlinkCreator {
     self.logger = ClassLogger(logger: logger, className: "SymlinkCreator")
   }
 
-  func create() throws {
+  func create(isEnabled: Bool = true) throws {
+    guard isEnabled else {
+      logger.warning("Symlink creator disabled - skipping")
+      return
+    }
+
     logger.info("Removing and recreating Album folders...")
     let startDate = timeProvider.getDate()
 

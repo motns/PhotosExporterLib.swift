@@ -218,10 +218,14 @@ extension AssetExportResult: Diffable, DiffableStruct {
     out += propertyDiff("assetUpdated", self.assetUpdated, other.assetUpdated) ?? ""
     out += propertyDiff("assetUnchanged", self.assetUnchanged, other.assetUnchanged) ?? ""
     out += propertyDiff("assetSkipped", self.assetSkipped, other.assetSkipped) ?? ""
+    out += propertyDiff("assetMarkedForDeletion", self.assetMarkedForDeletion, other.assetMarkedForDeletion) ?? ""
+    out += propertyDiff("assetDeleted", self.assetDeleted, other.assetDeleted) ?? ""
     out += propertyDiff("fileInserted", self.fileInserted, other.fileInserted) ?? ""
     out += propertyDiff("fileUpdated", self.fileUpdated, other.fileUpdated) ?? ""
     out += propertyDiff("fileUnchanged", self.fileUnchanged, other.fileUnchanged) ?? ""
     out += propertyDiff("fileSkipped", self.fileSkipped, other.fileSkipped) ?? ""
+    out += propertyDiff("fileMarkedForDeletion", self.fileMarkedForDeletion, other.fileMarkedForDeletion) ?? ""
+    out += propertyDiff("fileDeleted", self.fileDeleted, other.fileDeleted) ?? ""
     return out != "" ? out : nil
   }
 }
@@ -239,11 +243,11 @@ extension CollectionExportResult: Diffable, DiffableStruct {
   }
 }
 
-extension FileCopyResult: Diffable, DiffableStruct {
-  func getDiffAsString(_ other: FileCopyResult) -> String? {
+extension FileExportResult: Diffable, DiffableStruct {
+  func getDiffAsString(_ other: FileExportResult) -> String? {
     var out = ""
     out += propertyDiff("copied", self.copied, other.copied) ?? ""
-    out += propertyDiff("removed", self.removed, other.removed) ?? ""
+    out += propertyDiff("deleted", self.deleted, other.deleted) ?? ""
     return out != "" ? out : nil
   }
 }
@@ -257,7 +261,7 @@ extension ExportResult: Diffable, DiffableStruct {
     if let diff = self.collectionExport.getDiffAsString(other.collectionExport) {
       out += diff
     }
-    if let diff = self.fileCopy.getDiffAsString(other.fileCopy) {
+    if let diff = self.fileExport.getDiffAsString(other.fileExport) {
       out += diff
     }
     return out != "" ? out : nil

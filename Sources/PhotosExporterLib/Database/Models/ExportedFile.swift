@@ -129,6 +129,19 @@ struct ExportedFile: Codable, Equatable, Hashable {
     )
   }
 
+  static func generateId(asset: PhotokitAsset, resource: PhotokitAssetResource) -> String {
+    let datePrefix: String
+    if let date = asset.createdAt {
+      let formatter = DateFormatter()
+      formatter.dateFormat = "yyyyMMddHHmmss"
+      datePrefix = formatter.string(from: date)
+    } else {
+      datePrefix = "00000000000000"
+    }
+
+    return "\(datePrefix)-\(resource.fileSize)-\(resource.originalFileName)"
+  }
+
   static func fromPhotokitAssetResource(
     asset: PhotokitAsset,
     resource: PhotokitAssetResource,
@@ -148,17 +161,8 @@ struct ExportedFile: Codable, Equatable, Hashable {
     default: false
     }
 
-    let datePrefix: String
-    if let date = asset.createdAt {
-      let formatter = DateFormatter()
-      formatter.dateFormat = "yyyyMMddHHmmss"
-      datePrefix = formatter.string(from: date)
-    } else {
-      datePrefix = "00000000000000"
-    }
-
     return ExportedFile(
-      id: "\(datePrefix)-\(resource.fileSize)-\(resource.originalFileName)",
+      id: generateId(asset: asset, resource: resource),
       fileType: fileType,
       originalFileName: resource.originalFileName,
       fileSize: resource.fileSize,

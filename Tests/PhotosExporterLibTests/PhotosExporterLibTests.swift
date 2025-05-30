@@ -66,22 +66,19 @@ final class PhotosExporterLibTests {
     let resource3 = dataGen.createPhotokitAssetResource()
 
     let asset1 = try dataGen.createPhotokitAsset(
-      assetId: "E5481A99-EF62-41D4-B438-F878186E5903",
       resources: [resource1],
     )
     let asset2 = try dataGen.createPhotokitAsset(
-      assetId: "E94FE51B-4567-4E30-ADE7-77BFDFE6174E",
       resources: [resource2],
     )
     let asset3 = try dataGen.createPhotokitAsset(
-      assetId: "F2B766A4-D8C2-4BA9-836B-3055445525F0",
       assetLibrary: .sharedAlbum,
       resources: [resource3],
     )
 
-    self.photokitMock.assets = [asset1, asset2, asset3]
+    photokitMock.assets = [asset1, asset2, asset3]
 
-    self.photosDBMock.assetLocations = [
+    photosDBMock.assetLocations = [
       asset1.id: dataGen.createPostalAddress(country: "United Kingdom", city: "London"),
       asset2.id: dataGen.createPostalAddress(country: "Spain", city: "Madrid"),
       // asset3 won't have location data
@@ -99,9 +96,9 @@ final class PhotosExporterLibTests {
       subfolders: [folder2],
       albums: [album2],
     )
-    self.photokitMock.rootAlbums = [album1]
-    self.photokitMock.rootFolders = [folder1]
-    self.photokitMock.albums = [album1, album2, album3]
+    photokitMock.rootAlbums = [album1]
+    photokitMock.rootFolders = [folder1]
+    photokitMock.albums = [album1, album2, album3]
 
     // - MARK: Create expected models
     let exportedAsset1 = ExportedAsset.fromPhotokitAsset(
@@ -222,10 +219,14 @@ final class PhotosExporterLibTests {
         assetUpdated: 0,
         assetUnchanged: 0,
         assetSkipped: 0,
+        assetMarkedForDeletion: 0,
+        assetDeleted: 0,
         fileInserted: 3,
         fileUpdated: 0,
         fileUnchanged: 0,
-        fileSkipped: 0
+        fileSkipped: 0,
+        fileMarkedForDeletion: 0,
+        fileDeleted: 0,
       ),
       collectionExport: CollectionExportResult(
         folderInserted: 3,
@@ -235,7 +236,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0
       ),
-      fileCopy: FileCopyResult(copied: 3, removed: 0)
+      fileExport: FileExportResult(copied: 3, deleted: 0)
     )
 
     // - MARK: Initial run
@@ -357,10 +358,14 @@ final class PhotosExporterLibTests {
         assetUpdated: 0,
         assetUnchanged: 3,
         assetSkipped: 0,
+        assetMarkedForDeletion: 0,
+        assetDeleted: 0,
         fileInserted: 0,
         fileUpdated: 0,
         fileUnchanged: 3,
-        fileSkipped: 0
+        fileSkipped: 0,
+        fileMarkedForDeletion: 0,
+        fileDeleted: 0,
       ),
       collectionExport: CollectionExportResult(
         folderInserted: 0,
@@ -370,7 +375,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 3
       ),
-      fileCopy: FileCopyResult(copied: 0, removed: 0)
+      fileExport: FileExportResult(copied: 0, deleted: 0)
     )
     let noChangeRes = try await photosExporterLib.export()
     #expect(
@@ -394,8 +399,8 @@ final class PhotosExporterLibTests {
     let updatedAlbum1 = album1.copy(
       assetIds: [asset1.id, asset2.id]
     )
-    self.photokitMock.rootAlbums = [updatedAlbum1]
-    self.photokitMock.albums = [updatedAlbum1, album2, album3]
+    photokitMock.rootAlbums = [updatedAlbum1]
+    photokitMock.albums = [updatedAlbum1, album2, album3]
 
     let updatedExportedAsset1 = ExportedAsset.fromPhotokitAsset(
       asset: updatedAsset1,
@@ -445,10 +450,14 @@ final class PhotosExporterLibTests {
         assetUpdated: 2,
         assetUnchanged: 1,
         assetSkipped: 0,
+        assetMarkedForDeletion: 0,
+        assetDeleted: 0,
         fileInserted: 0,
         fileUpdated: 1,
         fileUnchanged: 2,
-        fileSkipped: 0
+        fileSkipped: 0,
+        fileMarkedForDeletion: 0,
+        fileDeleted: 0,
       ),
       collectionExport: CollectionExportResult(
         folderInserted: 0,
@@ -458,7 +467,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 1,
         albumUnchanged: 2
       ),
-      fileCopy: FileCopyResult(copied: 1, removed: 0)
+      fileExport: FileExportResult(copied: 1, deleted: 0)
     )
     let updateRes = try await photosExporterLib.export()
     #expect(
@@ -489,6 +498,508 @@ final class PhotosExporterLibTests {
     #expect(
       updatedAlbumsInDB == updatedExportedAlbums,
       "\(Diff.getDiffAsString(updatedAlbumsInDB, updatedExportedAlbums) ?? "")"
+    )
+  }
+
+  // - MARK: Expire and Delete test
+  @Test("Expire and Delete Assets and Files")
+  // swiftlint:disable:next function_body_length
+  func expireAndDeleteAssetsAndFiles() async throws {
+    let now = timeProvider.setTime(timeStr: "2025-04-05 12:05:30").getDate()
+    let exportBaseDirURL = URL(filePath: testDir)
+
+    // These will stay as-is
+    let resource1 = dataGen.createPhotokitAssetResource()
+    let resource2 = dataGen.createPhotokitAssetResource()
+    let resourceForAssetToDeleteLater = dataGen.createPhotokitAssetResource()
+    let resource4 = dataGen.createPhotokitAssetResource()
+    // This will be deleted later
+    let resourceToDeleteLater = dataGen.createPhotokitAssetResource()
+    // Sixth Resource here has already been deleted
+
+    let asset1 = try dataGen.createPhotokitAsset(
+      resources: [resource1],
+    )
+    let asset2 = try dataGen.createPhotokitAsset(
+      resources: [resource2],
+    )
+    let assetToDeleteLater = try dataGen.createPhotokitAsset(
+      resources: [resourceForAssetToDeleteLater],
+    )
+    let asset3 = try dataGen.createPhotokitAsset(
+      // One of these will be deleted later, one has already
+      // been deleted
+      resources: [resource4, resourceToDeleteLater],
+    )
+    // Fifth Asset has already been deleted
+
+    photokitMock.assets = [
+      asset1,
+      asset2,
+      assetToDeleteLater,
+      asset3,
+    ]
+
+    let exportedAsset1 = try dataGen.createAndSaveExportedAsset(
+      photokitAsset: asset1,
+      cityId: nil,
+      countryId: nil,
+      now: now,
+    )
+    let exportedFile1 = try dataGen.createAndSaveExportedFile(
+      photokitAsset: asset1,
+      photokitResource: asset1.resources[0],
+      countryOpt: nil,
+      cityOpt: nil,
+      now: now,
+      wasCopied: true,
+    )
+    let assetFile1 = try dataGen.createAndSaveAssetFile(
+      assetId: exportedAsset1.id,
+      fileId: exportedFile1.id,
+    )
+
+    let exportedAsset2 = try dataGen.createAndSaveExportedAsset(
+      photokitAsset: asset2,
+      cityId: nil,
+      countryId: nil,
+      now: now,
+    )
+    let exportedFile2 = try dataGen.createAndSaveExportedFile(
+      photokitAsset: asset2,
+      photokitResource: asset2.resources[0],
+      countryOpt: nil,
+      cityOpt: nil,
+      now: now,
+      wasCopied: true,
+    )
+    let assetFile2 = try dataGen.createAndSaveAssetFile(
+      assetId: exportedAsset2.id,
+      fileId: exportedFile2.id,
+    )
+
+    let exportedAssetToDeleteLater = try dataGen.createAndSaveExportedAsset(
+      photokitAsset: assetToDeleteLater,
+      cityId: nil,
+      countryId: nil,
+      now: now,
+    )
+    let exportedFileToDeleteLaterAsset = try dataGen.createAndSaveExportedFile(
+      photokitAsset: assetToDeleteLater,
+      photokitResource: assetToDeleteLater.resources[0],
+      countryOpt: nil,
+      cityOpt: nil,
+      now: now,
+      wasCopied: true,
+    )
+    let assetFileToDeleteLaterAsset = try dataGen.createAndSaveAssetFile(
+      assetId: exportedAssetToDeleteLater.id,
+      fileId: exportedFileToDeleteLaterAsset.id,
+    )
+
+    let exportedAsset3 = try dataGen.createAndSaveExportedAsset(
+      photokitAsset: asset3,
+      cityId: nil,
+      countryId: nil,
+      now: now,
+    )
+    let exportedFile3 = try dataGen.createAndSaveExportedFile(
+      photokitAsset: asset3,
+      photokitResource: asset3.resources[0],
+      countryOpt: nil,
+      cityOpt: nil,
+      now: now,
+      wasCopied: true,
+    )
+    let exportedFileToDeleteLater = try dataGen.createAndSaveExportedFile(
+      photokitAsset: asset3,
+      photokitResource: asset3.resources[1],
+      countryOpt: nil,
+      cityOpt: nil,
+      now: now,
+      wasCopied: true,
+    )
+    let exportedFileDeleted = try dataGen.createAndSaveExportedFile(
+      asset: exportedAsset3,
+      wasCopied: true,
+    )
+    let assetFile3 = try dataGen.createAndSaveAssetFile(
+      assetId: exportedAsset3.id,
+      fileId: exportedFile3.id,
+    )
+    let assetFileToDeleteLaterFile = try dataGen.createAndSaveAssetFile(
+      assetId: exportedAsset3.id,
+      fileId: exportedFileToDeleteLater.id,
+    )
+    let assetFileDeleted = try dataGen.createAndSaveAssetFile(
+      assetId: exportedAsset3.id,
+      fileId: exportedFileDeleted.id,
+    ).copy(
+      isDeleted: true,
+      deletedAt: now,
+    )
+
+    let exportedAssetDeleted = try dataGen.createAndSaveExportedAsset().copy(
+      isDeleted: true,
+      deletedAt: now,
+    )
+    let exportedFileForDeletedAsset = try dataGen.createAndSaveExportedFile(
+      asset: exportedAssetDeleted,
+      wasCopied: true,
+    )
+    let assetFileForDeletedAsset = try dataGen.createAndSaveAssetFile(
+      assetId: exportedAssetDeleted.id,
+      fileId: exportedFileForDeletedAsset.id,
+    ).copy(
+      isDeleted: true,
+      deletedAt: now,
+    )
+
+    let exportedAssets = [
+      exportedAsset1,
+      exportedAsset2,
+      exportedAssetToDeleteLater,
+      exportedAsset3,
+      exportedAssetDeleted,
+    ].sorted { $0.id < $1.id }
+    let exportedFiles = [
+      exportedFile1,
+      exportedFile2,
+      exportedFileToDeleteLaterAsset,
+      exportedFile3,
+      exportedFileToDeleteLater,
+      exportedFileDeleted,
+      exportedFileForDeletedAsset,
+    ].sorted { $0.id < $1.id }
+    let assetFiles = [
+      assetFile1,
+      assetFile2,
+      assetFileToDeleteLaterAsset,
+      assetFile3,
+      assetFileToDeleteLaterFile,
+      assetFileDeleted,
+      assetFileForDeletedAsset,
+    ].sorted { $0.fileId < $1.fileId }
+
+    // - MARK: First run - mark for deletion
+    let expectedMarkRes = ExportResult(
+      assetExport: AssetExportResult(
+        assetInserted: 0,
+        assetUpdated: 0,
+        assetUnchanged: 4,
+        assetSkipped: 0,
+        assetMarkedForDeletion: 1,
+        assetDeleted: 0,
+        fileInserted: 0,
+        fileUpdated: 0,
+        fileUnchanged: 5,
+        fileSkipped: 0,
+        fileMarkedForDeletion: 2,
+        fileDeleted: 0,
+      ),
+      collectionExport: CollectionExportResult(
+        folderInserted: 1,
+        folderUpdated: 0,
+        folderUnchanged: 0,
+        albumInserted: 0,
+        albumUpdated: 0,
+        albumUnchanged: 0,
+      ),
+      fileExport: FileExportResult(copied: 0, deleted: 0)
+    )
+
+    let markRes = try await photosExporterLib.export()
+    #expect(
+      markRes == expectedMarkRes,
+      "\(markRes.getDiffAsString(expectedMarkRes) ?? "")"
+    )
+
+    let assetsInDB = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
+    // Avoid using Sets, because they use Hashable instead of Comparable
+    #expect(
+      assetsInDB == exportedAssets,
+      "\(Diff.getDiffAsString(assetsInDB, exportedAssets) ?? "")"
+    )
+
+    let filesInDB = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
+    #expect(
+      filesInDB == exportedFiles,
+      "\(Diff.getDiffAsString(filesInDB, exportedFiles) ?? "")"
+    )
+
+    let assetFilesInDB = try exporterDB.getAllAssetFiles().sorted(by: { $0.fileId < $1.fileId })
+    #expect(
+      assetFilesInDB == assetFiles,
+      "\(Diff.getDiffAsString(assetFilesInDB, assetFiles) ?? "")"
+    )
+
+    // - MARK: Second run - no changes
+    let expectedNoChange = ExportResult(
+      assetExport: AssetExportResult(
+        assetInserted: 0,
+        assetUpdated: 0,
+        assetUnchanged: 4,
+        assetSkipped: 0,
+        assetMarkedForDeletion: 0,
+        assetDeleted: 0,
+        fileInserted: 0,
+        fileUpdated: 0,
+        fileUnchanged: 5,
+        fileSkipped: 0,
+        fileMarkedForDeletion: 0,
+        fileDeleted: 0,
+      ),
+      collectionExport: CollectionExportResult(
+        folderInserted: 0,
+        folderUpdated: 0,
+        folderUnchanged: 1,
+        albumInserted: 0,
+        albumUpdated: 0,
+        albumUnchanged: 0,
+      ),
+      fileExport: FileExportResult(copied: 0, deleted: 0)
+    )
+
+    let noChangeRes = try await photosExporterLib.export()
+    #expect(
+      noChangeRes == expectedNoChange,
+      "\(noChangeRes.getDiffAsString(expectedNoChange) ?? "")"
+    )
+
+    // - MARK: Third run - delete expired
+    _ = timeProvider.advanceTime(days: 31)
+
+    let expectedDelete = ExportResult(
+      assetExport: AssetExportResult(
+        assetInserted: 0,
+        assetUpdated: 0,
+        assetUnchanged: 4,
+        assetSkipped: 0,
+        assetMarkedForDeletion: 0,
+        assetDeleted: 1,
+        fileInserted: 0,
+        fileUpdated: 0,
+        fileUnchanged: 5,
+        fileSkipped: 0,
+        fileMarkedForDeletion: 0,
+        fileDeleted: 2,
+      ),
+      collectionExport: CollectionExportResult(
+        folderInserted: 0,
+        folderUpdated: 0,
+        folderUnchanged: 1,
+        albumInserted: 0,
+        albumUpdated: 0,
+        albumUnchanged: 0,
+      ),
+      fileExport: FileExportResult(copied: 0, deleted: 2)
+    )
+    let deleteRes = try await photosExporterLib.export()
+    #expect(
+      deleteRes == expectedDelete,
+      "\(deleteRes.getDiffAsString(expectedDelete) ?? "")"
+    )
+
+    let exportedAssetsAfterDelete = [
+      exportedAsset1,
+      exportedAsset2,
+      exportedAssetToDeleteLater,
+      exportedAsset3,
+    ].sorted { $0.id < $1.id }
+    let exportedFilesAfterDelete = [
+      exportedFile1,
+      exportedFile2,
+      exportedFileToDeleteLaterAsset,
+      exportedFile3,
+      exportedFileToDeleteLater,
+    ].sorted { $0.id < $1.id }
+    let assetFilesAfterDelete = [
+      assetFile1,
+      assetFile2,
+      assetFileToDeleteLaterAsset,
+      assetFile3,
+      assetFileToDeleteLaterFile,
+    ].sorted { $0.fileId < $1.fileId }
+
+    let assetsInDBAfterDelete = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
+    #expect(
+      assetsInDBAfterDelete == exportedAssetsAfterDelete,
+      "\(Diff.getDiffAsString(assetsInDBAfterDelete, exportedAssetsAfterDelete) ?? "")"
+    )
+
+    let filesInDBAfterDelete = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
+    #expect(
+      filesInDBAfterDelete == exportedFilesAfterDelete,
+      "\(Diff.getDiffAsString(filesInDBAfterDelete, exportedFilesAfterDelete) ?? "")"
+    )
+
+    let assetFilesInDBAfterDelete = try exporterDB.getAllAssetFiles().sorted(by: { $0.fileId < $1.fileId })
+    #expect(
+      assetFilesInDBAfterDelete == assetFilesAfterDelete,
+      "\(Diff.getDiffAsString(assetFilesInDBAfterDelete, assetFilesAfterDelete) ?? "")"
+    )
+
+    let fileDirURL = exportBaseDirURL.appending(path: "files")
+    let expectedRemoveCalls = [
+      RemoveCall(
+        url: fileDirURL
+          .appending(path: exportedFileDeleted.importedFileDir)
+          .appending(path: exportedFileDeleted.importedFileName),
+      ),
+      RemoveCall(
+        url: fileDirURL
+          .appending(path: exportedFileForDeletedAsset.importedFileDir)
+          .appending(path: exportedFileForDeletedAsset.importedFileName),
+      ),
+    ].sorted { $0.url.absoluteString < $1.url.absoluteString }
+
+    let sortedFilteredRemoveCalls = fileManagerMock.removeCalls
+      .filter {
+        // Remove calls will also include the ones made by the
+        // Symlink creator Module, so we need to filter those out
+        !$0.url.absoluteString.contains("album")
+      }
+      .sorted { $0.url.absoluteString < $1.url.absoluteString }
+    #expect(
+      sortedFilteredRemoveCalls == expectedRemoveCalls,
+      "\(Diff.getDiffAsString(sortedFilteredRemoveCalls, expectedRemoveCalls) ?? "")"
+    )
+
+    // - MARK: Fourth run - second expiry run
+    _ = timeProvider.advanceTime(days: 5)
+
+    // Remove one Asset and One Resource from source
+    photokitMock.assets = [
+      asset1,
+      asset2,
+      asset3.copy(
+        resources: [resource4],
+      ),
+    ]
+
+    let expectedMarkRes2 = ExportResult(
+      assetExport: AssetExportResult(
+        assetInserted: 0,
+        assetUpdated: 0,
+        assetUnchanged: 3,
+        assetSkipped: 0,
+        assetMarkedForDeletion: 1,
+        assetDeleted: 0,
+        fileInserted: 0,
+        fileUpdated: 0,
+        fileUnchanged: 3,
+        fileSkipped: 0,
+        fileMarkedForDeletion: 2,
+        fileDeleted: 0,
+      ),
+      collectionExport: CollectionExportResult(
+        folderInserted: 0,
+        folderUpdated: 0,
+        folderUnchanged: 1,
+        albumInserted: 0,
+        albumUpdated: 0,
+        albumUnchanged: 0,
+      ),
+      fileExport: FileExportResult(copied: 0, deleted: 0)
+    )
+    let markRes2 = try await photosExporterLib.export()
+    #expect(
+      markRes2 == expectedMarkRes2,
+      "\(markRes2.getDiffAsString(expectedMarkRes2) ?? "")",
+    )
+
+    // - MARK: Final run - second delete
+    _ = timeProvider.advanceTime(days: 31)
+    fileManagerMock.resetCalls()
+
+    let expectedDelete2 = ExportResult(
+      assetExport: AssetExportResult(
+        assetInserted: 0,
+        assetUpdated: 0,
+        assetUnchanged: 3,
+        assetSkipped: 0,
+        assetMarkedForDeletion: 0,
+        assetDeleted: 1,
+        fileInserted: 0,
+        fileUpdated: 0,
+        fileUnchanged: 3,
+        fileSkipped: 0,
+        fileMarkedForDeletion: 0,
+        fileDeleted: 2,
+      ),
+      collectionExport: CollectionExportResult(
+        folderInserted: 0,
+        folderUpdated: 0,
+        folderUnchanged: 1,
+        albumInserted: 0,
+        albumUpdated: 0,
+        albumUnchanged: 0,
+      ),
+      fileExport: FileExportResult(copied: 0, deleted: 2)
+    )
+    let deleteRes2 = try await photosExporterLib.export()
+    #expect(
+      deleteRes2 == expectedDelete2,
+      "\(deleteRes2.getDiffAsString(expectedDelete2) ?? "")"
+    )
+
+    let exportedAssetsAfterDelete2 = [
+      exportedAsset1,
+      exportedAsset2,
+      exportedAsset3,
+    ].sorted { $0.id < $1.id }
+    let exportedFilesAfterDelete2 = [
+      exportedFile1,
+      exportedFile2,
+      exportedFile3,
+    ].sorted { $0.id < $1.id }
+    let assetFilesAfterDelete2 = [
+      assetFile1,
+      assetFile2,
+      assetFile3,
+    ].sorted { $0.fileId < $1.fileId }
+
+    let assetsInDBAfterDelete2 = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
+    #expect(
+      assetsInDBAfterDelete2 == exportedAssetsAfterDelete2,
+      "\(Diff.getDiffAsString(assetsInDBAfterDelete2, exportedAssetsAfterDelete2) ?? "")"
+    )
+
+    let filesInDBAfterDelete2 = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
+    #expect(
+      filesInDBAfterDelete2 == exportedFilesAfterDelete2,
+      "\(Diff.getDiffAsString(filesInDBAfterDelete2, exportedFilesAfterDelete2) ?? "")"
+    )
+
+    let assetFilesInDBAfterDelete2 = try exporterDB.getAllAssetFiles().sorted(by: { $0.fileId < $1.fileId })
+    #expect(
+      assetFilesInDBAfterDelete2 == assetFilesAfterDelete2,
+      "\(Diff.getDiffAsString(assetFilesInDBAfterDelete2, assetFilesAfterDelete2) ?? "")"
+    )
+
+    let expectedRemoveCalls2 = [
+      RemoveCall(
+        url: fileDirURL
+          .appending(path: exportedFileToDeleteLaterAsset.importedFileDir)
+          .appending(path: exportedFileToDeleteLaterAsset.importedFileName),
+      ),
+      RemoveCall(
+        url: fileDirURL
+          .appending(path: exportedFileToDeleteLater.importedFileDir)
+          .appending(path: exportedFileToDeleteLater.importedFileName),
+      ),
+    ].sorted { $0.url.absoluteString < $1.url.absoluteString }
+
+    let sortedFilteredRemoveCalls2 = fileManagerMock.removeCalls
+      .filter {
+        // Remove calls will also include the ones made by the
+        // Symlink creator Module, so we need to filter those out
+        !$0.url.absoluteString.contains("album")
+      }
+      .sorted { $0.url.absoluteString < $1.url.absoluteString }
+    #expect(
+      sortedFilteredRemoveCalls2 == expectedRemoveCalls2,
+      "\(Diff.getDiffAsString(sortedFilteredRemoveCalls2, expectedRemoveCalls2) ?? "")"
     )
   }
 }

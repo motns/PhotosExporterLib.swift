@@ -29,7 +29,7 @@ final class PhotosExporterLibLiveTests {
 
     self.photosExporterLib = try await PhotosExporterLib(
       exportBaseDir: testDir,
-      loggerOpt: logger,
+      logger: logger,
     )
   }
 
@@ -47,10 +47,14 @@ final class PhotosExporterLibLiveTests {
         assetUpdated: 0,
         assetUnchanged: 0,
         assetSkipped: 0,
+        assetMarkedForDeletion: 0,
+        assetDeleted: 0,
         fileInserted: 8,
         fileUpdated: 0,
         fileUnchanged: 0,
-        fileSkipped: 0
+        fileSkipped: 0,
+        fileMarkedForDeletion: 0,
+        fileDeleted: 0,
       ),
       collectionExport: CollectionExportResult(
         folderInserted: 1,
@@ -60,7 +64,7 @@ final class PhotosExporterLibLiveTests {
         albumUpdated: 0,
         albumUnchanged: 0
       ),
-      fileCopy: FileCopyResult(copied: 8, removed: 0)
+      fileExport: FileExportResult(copied: 8, deleted: 0)
     )
 
     let initialRes = try await photosExporterLib.export()

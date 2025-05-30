@@ -89,6 +89,19 @@ extension ExporterDB {
     }
   }
 
+  func getAssetIdSet() throws -> Set<String> {
+    return try dbQueue.read { db in
+      try String.fetchSet(
+        db,
+        sql: """
+        SELECT id
+        FROM asset
+        WHERE is_deleted = false
+        """
+      )
+    }
+  }
+
   func getFile(id: String) throws -> ExportedFile? {
     logger.debug("Retrieving File", ["id": "\(id)"])
 
@@ -100,6 +113,102 @@ extension ExporterDB {
   func getAllFiles() throws -> [ExportedFile] {
     return try dbQueue.read { db in
       try ExportedFile.fetchAll(db)
+    }
+  }
+
+  func getFileIdSet() throws -> Set<String> {
+    return try dbQueue.read { db in
+      try String.fetchSet(
+        db,
+        sql: """
+        SELECT id
+        FROM file
+        WHERE NOT EXISTS(
+          SELECT 1
+          FROM asset_file
+          WHERE
+            asset_file.file_id = file.id
+            AND is_deleted = true
+        )
+        """
+      )
+    }
+  }
+
+  // Orphaned Files are the ones which are no longer linked
+  // to any assets via Asset Files
+  func getOrphanedFiles() throws -> [ExportedFile] {
+    logger.debug("Getting orphaned Files...")
+
+    return try dbQueue.read { db in
+      try ExportedFile.fetchAll(
+        db,
+        sql: """
+        SELECT
+          file.*
+        FROM file
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM asset_file
+          WHERE file_id = file.id
+        )
+        """
+      )
+    }
+  }
+
+  func getFilesWithAssetIdsToCopy() throws -> [ExportedFileWithAssetIds] {
+    logger.debug("Getting Files to copy...")
+
+    return try dbQueue.read { db in
+      try ExportedFileWithAssetIds.fetchAll(
+        db,
+        sql: """
+        SELECT
+          file.*,
+          asset_file_by_file.asset_ids
+        FROM file
+          JOIN (
+            SELECT
+              file_id,
+              json_group_array(asset_id) As asset_ids,
+              max(is_deleted) AS is_deleted
+            FROM asset_file
+            GROUP BY file_id
+          ) AS asset_file_by_file ON asset_file_by_file.file_id = file.id
+        WHERE
+          file.was_copied = false
+          AND asset_file_by_file.is_deleted = 0
+        """
+      )
+    }
+  }
+
+  func getFilesForAlbum(albumId: String) throws -> [ExportedFile] {
+    logger.debug("Getting Files for Album...", [
+      "album_id": "\(albumId)"
+    ])
+
+    return try dbQueue.read { db in
+      try ExportedFile.fetchAll(
+        db,
+        sql: """
+        SELECT
+          file.*
+        FROM file
+        WHERE file.id IN(
+          SELECT file_id
+          FROM asset_file
+          WHERE asset_id IN(
+            SELECT value
+            FROM album
+              JOIN json_each(album.asset_ids)
+            WHERE album.id = ?
+          )
+        )
+        """,
+        arguments: [albumId]
+      )
     }
   }
 
@@ -184,84 +293,6 @@ extension ExporterDB {
 
 // - MARK: Writing
 extension ExporterDB {
-  func markFileAsCopied(id: String) throws {
-    _ = try dbQueue.write { db in
-      try ExportedFile
-        .filter(id: id)
-        .updateAll(db) {
-          $0.wasCopied.set(to: true)
-        }
-    }
-  }
-
-  func markFileAsDeleted(id: String, now: Date? = nil) throws {
-    return try dbQueue.write { db in
-      try ExportedAssetFile.filter {
-        $0.fileId == id
-      }.updateAll(db) {
-        [
-          $0.isDeleted.set(to: true),
-          $0.deletedAt.set(to: now ?? Date()),
-        ]
-      }
-    }
-  }
-
-  func getFilesWithAssetIdsToCopy() throws -> [ExportedFileWithAssetIds] {
-    logger.debug("Getting Files to copy...")
-
-    return try dbQueue.read { db in
-      try ExportedFileWithAssetIds.fetchAll(
-        db,
-        sql: """
-        SELECT
-          file.*,
-          asset_file_by_file.asset_ids
-        FROM file
-          JOIN (
-            SELECT
-              file_id,
-              json_group_array(asset_id) As asset_ids,
-              max(is_deleted) AS is_deleted
-            FROM asset_file
-            GROUP BY file_id
-          ) AS asset_file_by_file ON asset_file_by_file.file_id = file.id
-        WHERE
-          file.was_copied = false
-          AND asset_file_by_file.is_deleted = 0
-        """
-      )
-    }
-  }
-
-  func getFilesForAlbum(albumId: String) throws -> [ExportedFile] {
-    logger.debug("Getting Files for Album...", [
-      "album_id": "\(albumId)"
-    ])
-
-    return try dbQueue.read { db in
-      try ExportedFile.fetchAll(
-        db,
-        sql: """
-        SELECT
-          file.*
-        FROM file
-        WHERE file.id IN(
-          SELECT file_id
-          FROM asset_file
-          WHERE asset_id IN(
-            SELECT value
-            FROM album
-              JOIN json_each(album.asset_ids)
-            WHERE album.id = ?
-          )
-        )
-        """,
-        arguments: [albumId]
-      )
-    }
-  }
-
   func upsertAsset(asset: ExportedAsset, now: Date? = nil) throws -> UpsertResult {
     let loggerMetadata: Logger.Metadata = [
       "asset_id": "\(asset.id)"
@@ -431,6 +462,100 @@ extension ExporterDB {
         logger.trace("New Album inserted", loggerMetadata)
         return UpsertResult.insert
       }
+    }
+  }
+
+  func markAssetAsDeleted(id: String, now: Date? = nil) throws {
+    logger.debug("Marking Asset as deleted...", [
+      "id": "\(id)",
+      "now": "\(String(describing: now))",
+    ])
+    return try dbQueue.write { db in
+      try ExportedAsset
+        .filter(id: id)
+        .updateAll(db) {
+          [
+            $0.isDeleted.set(to: true),
+            $0.deletedAt.set(to: now ?? Date()),
+          ]
+        }
+    }
+  }
+
+  func deleteExpiredAssets(cutoffDate: Date) throws -> (Int, Int) {
+    logger.debug("Deleting expired Assets...")
+    return try dbQueue.write { db in
+      let fileCnt = try ExportedAssetFile
+        .filter(
+          sql: """
+          asset_id IN(
+            SELECT id
+            FROM asset
+            WHERE
+              is_deleted = true
+              AND deleted_at < ?
+          )
+          """,
+          arguments: [cutoffDate]
+        ).deleteAll(db)
+
+      let assetCnt = try ExportedAsset
+        .filter {
+          $0.isDeleted == true
+          && $0.deletedAt < cutoffDate
+        }.deleteAll(db)
+
+      return (assetCnt, fileCnt)
+    }
+  }
+
+  func markFileAsCopied(id: String) throws {
+    logger.debug("Marking File as copied...", [
+      "id": "\(id)"
+    ])
+    _ = try dbQueue.write { db in
+      try ExportedFile
+        .filter(id: id)
+        .updateAll(db) {
+          $0.wasCopied.set(to: true)
+        }
+    }
+  }
+
+  func markFileAsDeleted(id: String, now: Date? = nil) throws {
+    logger.debug("Marking File as deleted...", [
+      "id": "\(id)",
+      "now": "\(String(describing: now))",
+    ])
+    return try dbQueue.write { db in
+      try ExportedAssetFile.filter {
+        $0.fileId == id
+      }.updateAll(db) {
+        [
+          $0.isDeleted.set(to: true),
+          $0.deletedAt.set(to: now ?? Date()),
+        ]
+      }
+    }
+  }
+
+  func deleteExpiredAssetFiles(cutoffDate: Date) throws -> Int {
+    logger.debug("Deleting expired Asset Files...")
+    return try dbQueue.write { db in
+      return try ExportedAssetFile
+        .filter {
+          $0.isDeleted == true
+          && $0.deletedAt < cutoffDate
+        }.deleteAll(db)
+    }
+  }
+
+  func deleteFile(id: String) throws -> Bool {
+    logger.debug("Deleting File with ID...", [
+      "id": "\(id)",
+    ])
+    return try dbQueue.write { db in
+      try ExportedFile.deleteOne(db, id: id)
     }
   }
 }

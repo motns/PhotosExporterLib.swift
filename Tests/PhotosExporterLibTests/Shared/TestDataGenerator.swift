@@ -1,6 +1,7 @@
 import Foundation
 @testable import PhotosExporterLib
 
+// swiftlint:disable:next type_body_length
 struct TestDataGenerator {
   let exporterDB: ExporterDB
 
@@ -73,6 +74,20 @@ struct TestDataGenerator {
   }
 
   func createExportedAsset(
+    photokitAsset: PhotokitAsset,
+    cityId: Int64?,
+    countryId: Int64?,
+    now: Date,
+  ) -> ExportedAsset {
+    return ExportedAsset.fromPhotokitAsset(
+      asset: photokitAsset,
+      cityId: cityId,
+      countryId: countryId,
+      now: now,
+    )!
+  }
+
+  func createExportedAsset(
     assetType: AssetType? = nil,
     assetLibrary: AssetLibrary? = nil,
     createdAt: Date? = nil,
@@ -81,6 +96,8 @@ struct TestDataGenerator {
     isFavourite: Bool? = nil,
     city: String? = nil,
     country: String? = nil,
+    isDeleted: Bool? = nil,
+    deletedAt: Date? = nil,
   ) throws -> ExportedAsset {
     let cityId: Int64? = if let city {
       try self.exporterDB.getLookupTableIdByName(
@@ -118,63 +135,180 @@ struct TestDataGenerator {
       geoLong: Double.random(in: -180...180),
       cityId: cityId,
       countryId: countryId,
-      isDeleted: false,
-      deletedAt: nil
+      isDeleted: isDeleted ?? false,
+      deletedAt: deletedAt
     )
   }
 
-  func insertAsset() throws -> ExportedAsset {
-    let asset = try createExportedAsset()
+  func createAndSaveExportedAsset(
+    photokitAsset: PhotokitAsset,
+    cityId: Int64?,
+    countryId: Int64?,
+    now: Date,
+  ) throws -> ExportedAsset {
+    let asset = ExportedAsset.fromPhotokitAsset(
+      asset: photokitAsset,
+      cityId: cityId,
+      countryId: countryId,
+      now: now,
+    )!
     _ = try exporterDB.upsertAsset(asset: asset)
     return asset
   }
 
-  func createFile(asset: ExportedAsset, city: String? = nil, country: String? = nil) -> ExportedFile {
+  func createAndSaveExportedAsset(
+    assetType: AssetType? = nil,
+    assetLibrary: AssetLibrary? = nil,
+    createdAt: Date? = nil,
+    updatedAt: Date? = nil,
+    importedAt: Date? = nil,
+    isFavourite: Bool? = nil,
+    city: String? = nil,
+    country: String? = nil,
+    isDeleted: Bool? = nil,
+    deletedAt: Date? = nil,
+  ) throws -> ExportedAsset {
+    let asset = try createExportedAsset(
+      assetType: assetType,
+      assetLibrary: assetLibrary,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      importedAt: importedAt,
+      isFavourite: isFavourite,
+      city: city,
+      country: country,
+      isDeleted: isDeleted,
+      deletedAt: deletedAt,
+    )
+    _ = try exporterDB.upsertAsset(asset: asset)
+    return asset
+  }
+
+  func createExportedFile(
+    photokitAsset: PhotokitAsset,
+    photokitResource: PhotokitAssetResource,
+    countryOpt: String?,
+    cityOpt: String?,
+    now: Date?,
+    wasCopied: Bool? = nil,
+  ) -> ExportedFile {
+    return ExportedFile.fromPhotokitAssetResource(
+      asset: photokitAsset,
+      resource: photokitResource,
+      countryOpt: countryOpt,
+      cityOpt: cityOpt,
+      now: now,
+    )!.copy(wasCopied: wasCopied ?? false)
+  }
+
+  func createExportedFile(
+    asset: ExportedAsset,
+    fileType: FileType? = nil,
+    originalFileName: String? = nil,
+    fileSize: Int64? = nil,
+    importedAt: Date? = nil,
+    city: String? = nil,
+    country: String? = nil,
+    wasCopied: Bool? = nil,
+  ) -> ExportedFile {
+    let randomFileName = "IMG0\(Int.random(in: 1...99999)).jpg"
     return ExportedFile(
       id: UUID().uuidString,
-      fileType: FileType.originalImage,
-      originalFileName: "IMG004.jpg",
-      fileSize: 1234567,
-      importedAt: TestHelpers.dateFromStr("2025-03-15 11:30:05")!,
+      fileType: fileType ?? FileType.originalImage,
+      originalFileName: originalFileName ?? randomFileName,
+      fileSize: fileSize ?? Int64.random(in: 1000000...99999999),
+      importedAt: importedAt ?? TestHelpers.dateFromStr("2025-03-15 11:30:05")!,
       importedFileDir: FileHelper.pathForDateAndLocation(
         dateOpt: asset.createdAt,
         countryOpt: country,
         cityOpt: city
       ),
       importedFileName: FileHelper.filenameWithDateAndEdited(
-        originalFileName: "IMG004.jpg",
+        originalFileName: randomFileName,
         dateOpt: asset.createdAt,
         isEdited: FileType.originalImage.isEdited()
       ),
-      wasCopied: false
+      wasCopied: wasCopied ?? false,
     )
   }
 
-  func insertFile(asset: ExportedAsset) throws -> ExportedFile {
-    let file = createFile(asset: asset)
+  func createAndSaveExportedFile(
+    asset: ExportedAsset,
+    fileType: FileType? = nil,
+    originalFileName: String? = nil,
+    fileSize: Int64? = nil,
+    importedAt: Date? = nil,
+    city: String? = nil,
+    country: String? = nil,
+    wasCopied: Bool? = nil,
+  ) throws -> ExportedFile {
+    let file = createExportedFile(
+      asset: asset,
+      fileType: fileType,
+      originalFileName: originalFileName,
+      fileSize: fileSize,
+      importedAt: importedAt,
+      city: city,
+      country: country,
+      wasCopied: wasCopied,
+    )
     _ = try exporterDB.upsertFile(file: file)
     return file
   }
 
-  func createAssetFile(asset: ExportedAsset, file: ExportedFile) -> ExportedAssetFile {
+  func createAndSaveExportedFile(
+    photokitAsset: PhotokitAsset,
+    photokitResource: PhotokitAssetResource,
+    countryOpt: String?,
+    cityOpt: String?,
+    now: Date?,
+    wasCopied: Bool? = nil,
+  ) throws -> ExportedFile {
+    let file = ExportedFile.fromPhotokitAssetResource(
+      asset: photokitAsset,
+      resource: photokitResource,
+      countryOpt: countryOpt,
+      cityOpt: cityOpt,
+      now: now,
+    )!.copy(wasCopied: wasCopied ?? false)
+    _ = try exporterDB.upsertFile(file: file)
+    return file
+  }
+
+  func createAssetFile(
+    assetId: String,
+    fileId: String,
+    isDeleted: Bool? = nil,
+    deletedAt: Date? = nil,
+  ) -> ExportedAssetFile {
     return ExportedAssetFile(
-      assetId: asset.id,
-      fileId: file.id,
-      isDeleted: false,
-      deletedAt: nil
+      assetId: assetId,
+      fileId: fileId,
+      isDeleted: isDeleted ?? false,
+      deletedAt: deletedAt
     )
   }
 
-  func insertAssetFile(asset: ExportedAsset, file: ExportedFile) throws -> ExportedAssetFile {
-    let assetFile = createAssetFile(asset: asset, file: file)
+  func createAndSaveAssetFile(
+    assetId: String,
+    fileId: String,
+    isDeleted: Bool? = nil,
+    deletedAt: Date? = nil,
+  ) throws -> ExportedAssetFile {
+    let assetFile = createAssetFile(
+      assetId: assetId,
+      fileId: fileId,
+      isDeleted: isDeleted,
+      deletedAt: deletedAt,
+    )
     _ = try exporterDB.upsertAssetFile(assetFile: assetFile)
     return assetFile
   }
 
-  func insertLinkedFile() throws -> (ExportedAsset, ExportedFile, ExportedAssetFile) {
-    let asset = try insertAsset()
-    let file = try insertFile(asset: asset)
-    let assetFile = try insertAssetFile(asset: asset, file: file)
+  func createAndSaveLinkedFile() throws -> (ExportedAsset, ExportedFile, ExportedAssetFile) {
+    let asset = try createAndSaveExportedAsset()
+    let file = try createAndSaveExportedFile(asset: asset)
+    let assetFile = try createAndSaveAssetFile(assetId: asset.id, fileId: file.id)
     return (asset, file, assetFile)
   }
 
