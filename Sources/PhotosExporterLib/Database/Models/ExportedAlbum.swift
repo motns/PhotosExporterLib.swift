@@ -80,7 +80,7 @@ extension ExportedAlbum: Identifiable, TableRecord, PersistableRecord, Fetchable
   }
 
   static func createTable(_ db: Database) throws {
-    try db.create(table: "album") { table in
+    try db.create(table: databaseTableName) { table in
       table.primaryKey("id", .text).notNull()
       table.column("album_type_id", .integer).notNull().references("album_type")
       table.column("album_folder_id", .text).notNull().references("album_folder")

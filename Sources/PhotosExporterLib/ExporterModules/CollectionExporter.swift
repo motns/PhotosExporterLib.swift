@@ -120,7 +120,7 @@ struct CollectionExporter {
   }
 }
 
-public struct CollectionExportResult: Sendable, Equatable {
+public struct CollectionExportResult: Codable, Sendable, Equatable {
   let folderInserted: Int
   let folderUpdated: Int
   let folderUnchanged: Int

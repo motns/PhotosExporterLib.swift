@@ -138,13 +138,13 @@ extension ExportedAsset: Diffable, DiffableStruct {
     out += propertyDiff("assetType", self.assetType, other.assetType) ?? ""
     out += propertyDiff("assetLibrary", self.assetLibrary, other.assetLibrary) ?? ""
     out += propertyDiff("createdAt", self.createdAt, other.createdAt) { lhs, rhs in
-      DateHelper.safeEquals(lhs, rhs)
+      DateHelper.secondsEquals(lhs, rhs)
     } ?? ""
     out += propertyDiff("updatedAt", self.updatedAt, other.updatedAt) { lhs, rhs in
-      DateHelper.safeEquals(lhs, rhs)
+      DateHelper.secondsEquals(lhs, rhs)
     } ?? ""
     out += propertyDiff("importedAt", self.importedAt, other.importedAt) { lhs, rhs in
-      DateHelper.safeEquals(lhs, rhs)
+      DateHelper.secondsEquals(lhs, rhs)
     } ?? ""
     out += propertyDiff("isFavourite", self.isFavourite, other.isFavourite) ?? ""
     out += propertyDiff("geoLat", self.geoLat, other.geoLat) ?? ""
@@ -153,7 +153,7 @@ extension ExportedAsset: Diffable, DiffableStruct {
     out += propertyDiff("countryId", self.countryId, other.countryId) ?? ""
     out += propertyDiff("isDeleted", self.isDeleted, other.isDeleted) ?? ""
     out += propertyDiff("deletedAt", self.deletedAt, other.deletedAt) { lhs, rhs in
-      DateHelper.safeEquals(lhs, rhs)
+      DateHelper.secondsEquals(lhs, rhs)
     } ?? ""
     return out != "" ? out : nil
   }
@@ -167,7 +167,7 @@ extension ExportedFile: Diffable, DiffableStruct {
     out += propertyDiff("originalFileName", self.originalFileName, other.originalFileName) ?? ""
     out += propertyDiff("fileSize", self.fileSize, other.fileSize) ?? ""
     out += propertyDiff("importedAt", self.importedAt, other.importedAt) { lhs, rhs in
-      DateHelper.safeEquals(lhs, rhs)
+      DateHelper.secondsEquals(lhs, rhs)
     } ?? ""
     out += propertyDiff("importedFileDir", self.importedFileDir, other.importedFileDir) ?? ""
     out += propertyDiff("importedFileName", self.importedFileName, other.importedFileName) ?? ""
@@ -183,7 +183,7 @@ extension ExportedAssetFile: Diffable, DiffableStruct {
     out += propertyDiff("fileId", self.fileId, other.fileId) ?? ""
     out += propertyDiff("isDeleted", self.isDeleted, other.isDeleted) ?? ""
     out += propertyDiff("deletedAt", self.deletedAt, other.deletedAt) { lhs, rhs in
-      DateHelper.safeEquals(lhs, rhs)
+      DateHelper.secondsEquals(lhs, rhs)
     } ?? ""
     return out != "" ? out : nil
   }
@@ -265,5 +265,53 @@ extension ExportResult: Diffable, DiffableStruct {
       out += diff
     }
     return out != "" ? out : nil
+  }
+}
+
+extension ExportResultHistoryEntry: Diffable, DiffableStruct {
+  func getDiffAsString(_ other: ExportResultHistoryEntry) -> String? {
+    var out = ""
+    out += propertyDiff("id", self.id, other.id) ?? ""
+    out += propertyDiff("createdAt", self.createdAt, other.createdAt) { lhs, rhs in
+      DateHelper.secondsEquals(lhs, rhs)
+    } ?? ""
+    if let diff = self.exportResult.getDiffAsString(other.exportResult) {
+      out += diff
+    }
+    out += propertyDiff("asset_count", self.assetCount, other.assetCount) ?? ""
+    out += propertyDiff("file_count", self.fileCount, other.fileCount) ?? ""
+    out += propertyDiff("album_count", self.albumCount, other.albumCount) ?? ""
+    out += propertyDiff("folder_count", self.folderCount, other.folderCount) ?? ""
+    return out != "" ? out : nil
+  }
+}
+
+extension HistoryEntry: Diffable, DiffableStruct {
+  func getDiffAsString(_ other: HistoryEntry) -> String? {
+    var out = ""
+    out += propertyDiff("id", self.id, other.id) ?? ""
+    out += propertyDiff("createdAt", self.createdAt, other.createdAt) { lhs, rhs in
+      DateHelper.secondsEquals(lhs, rhs)
+    } ?? ""
+    if let diff = self.exportResult.getDiffAsString(other.exportResult) {
+      out += diff
+    }
+    out += propertyDiff("asset_count", self.assetCount, other.assetCount) ?? ""
+    out += propertyDiff("file_count", self.fileCount, other.fileCount) ?? ""
+    out += propertyDiff("album_count", self.albumCount, other.albumCount) ?? ""
+    out += propertyDiff("folder_count", self.folderCount, other.folderCount) ?? ""
+    return out != "" ? out : nil
+  }
+}
+
+extension HistoryEntry: Equatable {
+  public static func == (lhs: HistoryEntry, rhs: HistoryEntry) -> Bool {
+    return lhs.id == rhs.id
+      && DateHelper.secondsEquals(lhs.createdAt, rhs.createdAt)
+      && lhs.exportResult == rhs.exportResult
+      && lhs.assetCount == rhs.assetCount
+      && lhs.fileCount == rhs.fileCount
+      && lhs.albumCount == rhs.albumCount
+      && lhs.folderCount == rhs.folderCount
   }
 }

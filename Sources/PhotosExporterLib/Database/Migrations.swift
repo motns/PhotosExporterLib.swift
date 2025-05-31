@@ -104,6 +104,7 @@ private struct MainTablesInitialMigration: MigrationDef {
       try ExportedAssetFile.createTable(db)
       try ExportedFolder.createTable(db)
       try ExportedAlbum.createTable(db)
+      try ExportResultHistoryEntry.createTable(db)
     }
   }
 }

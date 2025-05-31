@@ -164,6 +164,10 @@ public struct PhotosExporterLib {
     }
   }
 
+  public func lastRun() throws -> HistoryEntry? {
+    return try exporterDB.getLatestExportResultHistoryEntry()?.toPublicEntry()
+  }
+
   public func export(
     assetExportEnabled: Bool = true,
     collectionExportEnabled: Bool = true,
@@ -178,14 +182,33 @@ public struct PhotosExporterLib {
     let fileManagerResult = try await fileExporter.run(isEnabled: fileManagerEnabled)
     try symlinkCreator.create(isEnabled: symlinkCreatorEnabled)
 
-    logger.info("Export complete in \(timeProvider.secondsPassedSince(startDate))s")
-    return ExportResult(
+    let exportResult = ExportResult(
       assetExport: exportAssetResult.copy(
         fileMarkedForDeletion: exportAssetResult.fileMarkedForDeletion + fileManagerResult.fileMarkedForDeletion
       ),
       collectionExport: albumExportResult,
       fileExport: fileManagerResult.result,
     )
+
+    logger.debug("Writing Export Result History entry to DB...")
+    let assetCount = try exporterDB.countAssets()
+    let fileCount = try exporterDB.countFiles()
+    let albumCount = try exporterDB.countAlbums()
+    let folderCount = try exporterDB.countFolders()
+
+    let historyEntry = ExportResultHistoryEntry(
+      id: UUID().uuidString,
+      createdAt: timeProvider.getDate(),
+      exportResult: exportResult,
+      assetCount: assetCount,
+      fileCount: fileCount,
+      albumCount: albumCount,
+      folderCount: folderCount
+    )
+    _ = try exporterDB.insertExportResultHistoryEntry(entry: historyEntry)
+
+    logger.info("Export complete in \(timeProvider.secondsPassedSince(startDate))s")
+    return exportResult
   }
 }
 
@@ -196,7 +219,7 @@ public enum PhotosExporterError: Error {
   case unexpectedError(String)
 }
 
-public struct ExportResult: Sendable, Equatable {
+public struct ExportResult: Codable, Sendable, Equatable {
   let assetExport: AssetExportResult
   let collectionExport: CollectionExportResult
   let fileExport: FileExportResult

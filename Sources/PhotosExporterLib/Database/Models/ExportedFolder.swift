@@ -56,7 +56,7 @@ extension ExportedFolder: Identifiable, TableRecord, PersistableRecord, Fetchabl
   }
 
   static func createTable(_ db: Database) throws {
-    try db.create(table: "album_folder") { table in
+    try db.create(table: databaseTableName) { table in
       table.primaryKey("id", .text).notNull()
       table.column("name", .text).notNull()
       table.column("parent_id", .text).references("album_folder")

@@ -54,7 +54,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
   }
 
   func needsUpdate(_ other: ExportedAsset) -> Bool {
-    return !DateHelper.safeEquals(self.updatedAt, other.updatedAt)
+    return !DateHelper.secondsEquals(self.updatedAt, other.updatedAt)
       || self.isFavourite != other.isFavourite
       || self.geoLat != other.geoLat
       || self.geoLong != other.geoLong
@@ -66,16 +66,16 @@ struct ExportedAsset: Codable, Equatable, Hashable {
     return lhs.id == rhs.id
       && lhs.assetType == rhs.assetType
       && lhs.assetLibrary == rhs.assetLibrary
-      && DateHelper.safeEquals(lhs.createdAt, rhs.createdAt)
-      && DateHelper.safeEquals(lhs.updatedAt, rhs.updatedAt)
-      && DateHelper.safeEquals(lhs.importedAt, rhs.importedAt)
+      && DateHelper.secondsEquals(lhs.createdAt, rhs.createdAt)
+      && DateHelper.secondsEquals(lhs.updatedAt, rhs.updatedAt)
+      && DateHelper.secondsEquals(lhs.importedAt, rhs.importedAt)
       && lhs.isFavourite == rhs.isFavourite
       && lhs.geoLat == rhs.geoLat
       && lhs.geoLong == rhs.geoLong
       && lhs.cityId == rhs.cityId
       && lhs.countryId == rhs.countryId
       && lhs.isDeleted == rhs.isDeleted
-      && DateHelper.safeEquals(lhs.deletedAt, rhs.deletedAt)
+      && DateHelper.secondsEquals(lhs.deletedAt, rhs.deletedAt)
   }
 
   func copy(
@@ -172,7 +172,7 @@ extension ExportedAsset: Identifiable, TableRecord, PersistableRecord, Fetchable
   }
 
   static func createTable(_ db: Database) throws {
-    try db.create(table: "asset") { table in
+    try db.create(table: databaseTableName) { table in
       table.primaryKey("id", .text).notNull()
       table.column("asset_type_id", .integer).notNull().references("asset_type")
       table.column("asset_library_id", .integer).notNull().references("asset_library")

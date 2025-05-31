@@ -79,7 +79,7 @@ struct ExportedFile: Codable, Equatable, Hashable {
       && lhs.fileType == rhs.fileType
       && lhs.originalFileName == rhs.originalFileName
       && lhs.fileSize == rhs.fileSize
-      && DateHelper.safeEquals(lhs.importedAt, rhs.importedAt)
+      && DateHelper.secondsEquals(lhs.importedAt, rhs.importedAt)
       && lhs.importedFileDir == rhs.importedFileDir
       && lhs.importedFileName == rhs.importedFileName
       && lhs.wasCopied == rhs.wasCopied
@@ -196,7 +196,7 @@ extension ExportedFile: Identifiable, TableRecord, PersistableRecord, FetchableR
   }
 
   static func createTable(_ db: Database) throws {
-    try db.create(table: "file") { table in
+    try db.create(table: databaseTableName) { table in
       table.primaryKey("id", .text).notNull()
       table.column("file_type_id", .integer).notNull().references("file_type")
       table.column("original_file_name", .text).notNull()

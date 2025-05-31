@@ -31,6 +31,49 @@ final class ExporterDBTests {
     }
   }
 
+  @Test("Count Assets")
+  func countAssets() throws {
+    try (1...15).forEach { _ in
+      _ = try dataGen.createAndSaveExportedAsset()
+    }
+
+    let res = try exporterDB.countAssets()
+    #expect(res == 15)
+  }
+
+  @Test("Count Files")
+  func countFiles() throws {
+    try (1...12).forEach { _ in
+      _ = try dataGen.createAndSaveLinkedFile()
+    }
+
+    let res = try exporterDB.countFiles()
+    #expect(res == 12)
+  }
+
+  @Test("Count Albums")
+  func countAlbums() throws {
+    let folder = try dataGen.createAndSaveExportedFolder()
+    try (1...9).forEach { _ in
+      _ = try dataGen.createAndSaveExportedAlbum(
+        albumFolderId: folder.id
+      )
+    }
+
+    let res = try exporterDB.countAlbums()
+    #expect(res == 9)
+  }
+
+  @Test("Count Folders")
+  func countFolders() throws {
+    try (1...7).forEach { _ in
+      _ = try dataGen.createAndSaveExportedFolder()
+    }
+
+    let res = try exporterDB.countFolders()
+    #expect(res == 7)
+  }
+
   @Test("Get Asset ID Set")
   func getAssetIdSet() throws {
     let asset1 = try dataGen.createAndSaveExportedAsset()
@@ -539,5 +582,53 @@ final class ExporterDBTests {
 
     _ = try exporterDB.deleteFile(id: file.id)
     #expect(try exporterDB.getFile(id: file.id) == nil)
+  }
+
+  @Test("Insert Export Result History Entry")
+  func insertExportResultHistoryEntry() throws {
+    let now = testTimeProvider.getDate()
+    let entry = dataGen.createExportResultHistoryEntry(now: now)
+
+    try exporterDB.insertExportResultHistoryEntry(entry: entry)
+    let entryInDB = try exporterDB.getExportResultHistoryEntry(id: entry.id)
+    #expect(
+      entryInDB == entry,
+      "\(entryInDB?.getDiffAsString(entry) ?? "")"
+    )
+  }
+
+  @Test("Get Latest Export Result History Entry")
+  func getLatestExportResultHistoryEntry() throws {
+    let entries = try (0...5).map { _ in
+      try dataGen.createAndSaveExportResultHistoryEntry()
+    }.sorted { $1.createdAt < $0.createdAt }
+    let latestEntry = entries.first!
+
+    let latestEntryInDB = try exporterDB.getLatestExportResultHistoryEntry()
+    #expect(
+      latestEntryInDB == latestEntry,
+      "\(latestEntryInDB?.getDiffAsString(latestEntry) ?? "")"
+    )
+  }
+
+  @Test("Get Export Result History Entry list")
+  func getExportResultHistoryEntries() throws {
+    let entries = try (0...25).map { _ in
+      try dataGen.createAndSaveExportResultHistoryEntry()
+    }.sorted { $1.createdAt < $0.createdAt }
+
+    let first10Expected = Array(entries[0..<10])
+    let first10Res = try exporterDB.getExportResultHistoryEntries(limit: 10)
+    #expect(
+      first10Res == first10Expected,
+      "\(Diff.getDiffAsString(first10Res, first10Expected) ?? "")",
+    )
+
+    let next10Expected = Array(entries[10..<20])
+    let next10Res = try exporterDB.getExportResultHistoryEntries(limit: 10, offset: 10)
+    #expect(
+      next10Res == next10Expected,
+      "\(Diff.getDiffAsString(next10Res, next10Expected) ?? "")",
+    )
   }
 }

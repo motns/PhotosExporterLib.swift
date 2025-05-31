@@ -51,19 +51,19 @@ struct FileHelperTests {
 @Suite("Date Helper tests")
 struct DateHelperTests {
   @Test("Safe Equals")
-  func safeEquals() {
+  func secondsEquals() {
 
-    #expect(DateHelper.safeEquals(
+    #expect(DateHelper.secondsEquals(
       Date(timeIntervalSince1970: 1269099904),
       Date(timeIntervalSince1970: 1269099904),
     ) == true)
 
-    #expect(DateHelper.safeEquals(
+    #expect(DateHelper.secondsEquals(
       Date(timeIntervalSince1970: 1269099904.123),
       Date(timeIntervalSince1970: 1269099904.456),
     ) == true)
 
-    #expect(DateHelper.safeEquals(
+    #expect(DateHelper.secondsEquals(
       Date(timeIntervalSince1970: 1269099904),
       Date(timeIntervalSince1970: 1269099905),
     ) == false)

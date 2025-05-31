@@ -89,6 +89,12 @@ extension ExporterDB {
     }
   }
 
+  func countAssets() throws -> Int {
+    return try dbQueue.read { db in
+      try ExportedAsset.fetchCount(db)
+    }
+  }
+
   func getAssetIdSet() throws -> Set<String> {
     return try dbQueue.read { db in
       try String.fetchSet(
@@ -113,6 +119,12 @@ extension ExporterDB {
   func getAllFiles() throws -> [ExportedFile] {
     return try dbQueue.read { db in
       try ExportedFile.fetchAll(db)
+    }
+  }
+
+  func countFiles() throws -> Int {
+    return try dbQueue.read { db in
+      try ExportedFile.fetchCount(db)
     }
   }
 
@@ -248,6 +260,12 @@ extension ExporterDB {
     }
   }
 
+  func countFolders() throws -> Int {
+    return try dbQueue.read { db in
+      try ExportedFolder.fetchCount(db)
+    }
+  }
+
   func getFoldersWithParent(parentId: String) throws -> [ExportedFolder] {
     logger.debug("Retrieving Folders with given Parent", [
       "parent_id": "\(parentId)"
@@ -287,6 +305,36 @@ extension ExporterDB {
   func getAllAlbums() throws -> [ExportedAlbum] {
     return try dbQueue.read { db in
       try ExportedAlbum.fetchAll(db)
+    }
+  }
+
+  func countAlbums() throws -> Int {
+    return try dbQueue.read { db in
+      try ExportedAlbum.fetchCount(db)
+    }
+  }
+
+  func getExportResultHistoryEntry(id: String) throws -> ExportResultHistoryEntry? {
+    return try dbQueue.read { db in
+      try ExportResultHistoryEntry.fetchOne(db, id: id)
+    }
+  }
+
+  func getLatestExportResultHistoryEntry() throws -> ExportResultHistoryEntry? {
+    return try dbQueue.read { db in
+      try ExportResultHistoryEntry
+        .order(\.createdAt.desc)
+        .limit(1)
+        .fetchOne(db)
+    }
+  }
+
+  func getExportResultHistoryEntries(limit: Int = 10, offset: Int? = nil) throws -> [ExportResultHistoryEntry] {
+    return try dbQueue.read { db in
+      try ExportResultHistoryEntry
+        .order(\.createdAt.desc)
+        .limit(limit, offset: offset)
+        .fetchAll(db)
     }
   }
 }
@@ -556,6 +604,12 @@ extension ExporterDB {
     ])
     return try dbQueue.write { db in
       try ExportedFile.deleteOne(db, id: id)
+    }
+  }
+
+  func insertExportResultHistoryEntry(entry: ExportResultHistoryEntry) throws {
+    try dbQueue.write { db in
+      try entry.insert(db)
     }
   }
 }

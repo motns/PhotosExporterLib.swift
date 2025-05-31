@@ -128,7 +128,7 @@ struct FileExporter {
   }
 }
 
-public struct FileExportResult: Sendable, Equatable {
+public struct FileExportResult: Codable, Sendable, Equatable {
   let copied: Int
   let deleted: Int
 

@@ -58,7 +58,7 @@ final class PhotosExporterLibTests {
   // swiftlint:disable:next function_body_length
   func exportIntoEmptyDB() async throws {
     // - MARK: Set up test data
-    let now = timeProvider.freezeTime().getDate()
+    let startTime = timeProvider.freezeTime().getDate()
     let exportBaseDirURL = URL(filePath: testDir)
 
     let resource1 = dataGen.createPhotokitAssetResource()
@@ -105,14 +105,14 @@ final class PhotosExporterLibTests {
       asset: asset1,
       cityId: try cityLookup.getIdByName(name: "London"),
       countryId: try countryLookup.getIdByName(name: "United Kingdom"),
-      now: now,
+      now: startTime,
     )!
     let exportedFile1 = ExportedFile.fromPhotokitAssetResource(
       asset: asset1,
       resource: asset1.resources[0],
       countryOpt: "United Kingdom",
       cityOpt: "London",
-      now: now,
+      now: startTime,
     )!.copy(wasCopied: true)
     let assetFile1 = ExportedAssetFile(
       assetId: exportedAsset1.id,
@@ -125,14 +125,14 @@ final class PhotosExporterLibTests {
       asset: asset2,
       cityId: try cityLookup.getIdByName(name: "Madrid"),
       countryId: try countryLookup.getIdByName(name: "Spain"),
-      now: now,
+      now: startTime,
     )!
     let exportedFile2 = ExportedFile.fromPhotokitAssetResource(
       asset: asset2,
       resource: asset2.resources[0],
       countryOpt: "Spain",
       cityOpt: "Madrid",
-      now: now,
+      now: startTime,
     )!.copy(wasCopied: true)
     let assetFile2 = ExportedAssetFile(
       assetId: exportedAsset2.id,
@@ -145,14 +145,14 @@ final class PhotosExporterLibTests {
       asset: asset3,
       cityId: nil,
       countryId: nil,
-      now: now,
+      now: startTime,
     )!
     let exportedFile3 = ExportedFile.fromPhotokitAssetResource(
       asset: asset3,
       resource: asset3.resources[0],
       countryOpt: nil,
       cityOpt: nil,
-      now: now,
+      now: startTime,
     )!.copy(wasCopied: true)
     let assetFile3 = ExportedAssetFile(
       assetId: exportedAsset3.id,
@@ -351,7 +351,25 @@ final class PhotosExporterLibTests {
       "\(Diff.getDiffAsString(albumsInDB, exportedAlbums) ?? "")"
     )
 
+    let historyEntryInDBInitial = try photosExporterLib.lastRun()
+    let expectedHistoryEntryInitial = HistoryEntry(
+      id: historyEntryInDBInitial!.id,
+      createdAt: timeProvider.getDate(),
+      exportResult: expectedInitialRes,
+      assetCount: 3,
+      fileCount: 3,
+      albumCount: 3,
+      folderCount: 3,
+    )
+
+    #expect(
+      historyEntryInDBInitial == expectedHistoryEntryInitial,
+      "\(historyEntryInDBInitial?.getDiffAsString(expectedHistoryEntryInitial) ?? "")",
+    )
+
     // - MARK: No change run
+    _ = timeProvider.advanceTime(hours: 2)
+
     let expectedNoChangeRes = ExportResult(
       assetExport: AssetExportResult(
         assetInserted: 0,
@@ -386,6 +404,8 @@ final class PhotosExporterLibTests {
     #expect(photokitMock.copyResourceCalls.count == 3)
 
     // - MARK: Update run
+    _ = timeProvider.advanceTime(hours: 2)
+
     let updatedAsset1 = asset1.copy(
       isFavourite: !asset1.isFavourite
     )
@@ -406,21 +426,21 @@ final class PhotosExporterLibTests {
       asset: updatedAsset1,
       cityId: try cityLookup.getIdByName(name: "London"),
       countryId: try countryLookup.getIdByName(name: "United Kingdom"),
-      now: now,
+      now: startTime,
     )!
 
     let updatedExportedAsset2 = ExportedAsset.fromPhotokitAsset(
       asset: asset2,
       cityId: try cityLookup.getIdByName(name: "Budapest"),
       countryId: try countryLookup.getIdByName(name: "Hungary"),
-      now: now,
+      now: startTime,
     )!
     let updatedExportedFile2 = ExportedFile.fromPhotokitAssetResource(
       asset: asset2,
       resource: asset2.resources[0],
       countryOpt: "Hungary",
       cityOpt: "Budapest",
-      now: now,
+      now: startTime,
     )!.copy(wasCopied: true)
 
     let updatedExportedAlbum1 = try ExportedAlbum.fromPhotokitAlbum(
@@ -733,7 +753,24 @@ final class PhotosExporterLibTests {
       "\(Diff.getDiffAsString(assetFilesInDB, assetFiles) ?? "")"
     )
 
+    let historyEntryInDBMark = try photosExporterLib.lastRun()
+    let expectedHistoryEntryMark = HistoryEntry(
+      id: historyEntryInDBMark!.id,
+      createdAt: timeProvider.getDate(),
+      exportResult: markRes,
+      assetCount: 5,
+      fileCount: 7,
+      albumCount: 0,
+      folderCount: 1,
+    )
+
+    #expect(
+      historyEntryInDBMark == expectedHistoryEntryMark,
+      "\(historyEntryInDBMark?.getDiffAsString(expectedHistoryEntryMark) ?? "")",
+    )
+
     // - MARK: Second run - no changes
+    _ = timeProvider.advanceTime(minutes: 10)
     let expectedNoChange = ExportResult(
       assetExport: AssetExportResult(
         assetInserted: 0,
@@ -764,6 +801,22 @@ final class PhotosExporterLibTests {
     #expect(
       noChangeRes == expectedNoChange,
       "\(noChangeRes.getDiffAsString(expectedNoChange) ?? "")"
+    )
+
+    let historyEntryInDBNoChange = try photosExporterLib.lastRun()
+    let expectedHistoryEntryNoChange = HistoryEntry(
+      id: historyEntryInDBNoChange!.id,
+      createdAt: timeProvider.getDate(),
+      exportResult: noChangeRes,
+      assetCount: 5,
+      fileCount: 7,
+      albumCount: 0,
+      folderCount: 1,
+    )
+
+    #expect(
+      historyEntryInDBNoChange == expectedHistoryEntryNoChange,
+      "\(historyEntryInDBNoChange?.getDiffAsString(expectedHistoryEntryNoChange) ?? "")",
     )
 
     // - MARK: Third run - delete expired
@@ -798,6 +851,22 @@ final class PhotosExporterLibTests {
     #expect(
       deleteRes == expectedDelete,
       "\(deleteRes.getDiffAsString(expectedDelete) ?? "")"
+    )
+
+    let historyEntryInDBDelete = try photosExporterLib.lastRun()
+    let expectedHistoryEntryDelete = HistoryEntry(
+      id: historyEntryInDBDelete!.id,
+      createdAt: timeProvider.getDate(),
+      exportResult: deleteRes,
+      assetCount: 4,
+      fileCount: 5,
+      albumCount: 0,
+      folderCount: 1,
+    )
+
+    #expect(
+      historyEntryInDBDelete == expectedHistoryEntryDelete,
+      "\(historyEntryInDBDelete?.getDiffAsString(expectedHistoryEntryDelete) ?? "")",
     )
 
     let exportedAssetsAfterDelete = [
@@ -908,6 +977,22 @@ final class PhotosExporterLibTests {
       "\(markRes2.getDiffAsString(expectedMarkRes2) ?? "")",
     )
 
+    let historyEntryInDBMark2 = try photosExporterLib.lastRun()
+    let expectedHistoryEntryMark2 = HistoryEntry(
+      id: historyEntryInDBMark2!.id,
+      createdAt: timeProvider.getDate(),
+      exportResult: markRes2,
+      assetCount: 4,
+      fileCount: 5,
+      albumCount: 0,
+      folderCount: 1,
+    )
+
+    #expect(
+      historyEntryInDBMark2 == expectedHistoryEntryMark2,
+      "\(historyEntryInDBMark2?.getDiffAsString(expectedHistoryEntryMark2) ?? "")",
+    )
+
     // - MARK: Final run - second delete
     _ = timeProvider.advanceTime(days: 31)
     fileManagerMock.resetCalls()
@@ -941,6 +1026,22 @@ final class PhotosExporterLibTests {
     #expect(
       deleteRes2 == expectedDelete2,
       "\(deleteRes2.getDiffAsString(expectedDelete2) ?? "")"
+    )
+
+    let historyEntryInDBDelete2 = try photosExporterLib.lastRun()
+    let expectedHistoryEntryDelete2 = HistoryEntry(
+      id: historyEntryInDBDelete2!.id,
+      createdAt: timeProvider.getDate(),
+      exportResult: deleteRes2,
+      assetCount: 3,
+      fileCount: 3,
+      albumCount: 0,
+      folderCount: 1,
+    )
+
+    #expect(
+      historyEntryInDBDelete2 == expectedHistoryEntryDelete2,
+      "\(historyEntryInDBDelete2?.getDiffAsString(expectedHistoryEntryDelete2) ?? "")",
     )
 
     let exportedAssetsAfterDelete2 = [

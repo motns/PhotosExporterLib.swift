@@ -326,6 +326,29 @@ struct TestDataGenerator {
     )
   }
 
+  func createExportedFolder(
+    name: String? = nil,
+    parentId: String? = nil,
+  ) -> ExportedFolder {
+    return ExportedFolder(
+      id: UUID().uuidString,
+      name: name ?? "My Folder \(Int.random(in: 1...99))",
+      parentId: parentId,
+    )
+  }
+
+  func createAndSaveExportedFolder(
+    name: String? = nil,
+    parentId: String? = nil,
+  ) throws -> ExportedFolder {
+    let folder = createExportedFolder(
+      name: name,
+      parentId: parentId,
+    )
+    _ = try exporterDB.upsertFolder(folder: folder)
+    return folder
+  }
+
   func createPhotokitAlbum(
     id: String? = nil,
     title: String? = nil,
@@ -338,5 +361,87 @@ struct TestDataGenerator {
       collectionSubtype: .albumRegular,
       assetIds: assetIds ?? [],
     )
+  }
+
+  func createExportedAlbum(
+    albumFolderId: String,
+    albumType: AlbumType? = nil,
+    name: String? = nil,
+    assetIds: Set<String>? = nil,
+  ) -> ExportedAlbum {
+    return ExportedAlbum(
+      id: UUID().uuidString,
+      albumType: albumType ?? .user,
+      albumFolderId: albumFolderId,
+      name: name ?? "My Album \(Int.random(in: 1...9999))",
+      assetIds: assetIds ?? Set(),
+    )
+  }
+
+  func createAndSaveExportedAlbum(
+    albumFolderId: String,
+    albumType: AlbumType? = nil,
+    name: String? = nil,
+    assetIds: Set<String>? = nil,
+  ) throws -> ExportedAlbum {
+    let album = createExportedAlbum(
+      albumFolderId: albumFolderId,
+      albumType: albumType,
+      name: name,
+      assetIds: assetIds,
+    )
+    _ = try exporterDB.upsertAlbum(album: album)
+    return album
+  }
+
+  func createExportResult() -> ExportResult {
+    return ExportResult(
+      assetExport: AssetExportResult(
+        assetInserted: Int.random(in: 0...9999),
+        assetUpdated: Int.random(in: 0...9999),
+        assetUnchanged: Int.random(in: 0...9999),
+        assetSkipped: Int.random(in: 0...9999),
+        assetMarkedForDeletion: Int.random(in: 0...9999),
+        assetDeleted: Int.random(in: 0...9999),
+        fileInserted: Int.random(in: 0...9999),
+        fileUpdated: Int.random(in: 0...9999),
+        fileUnchanged: Int.random(in: 0...9999),
+        fileSkipped: Int.random(in: 0...9999),
+        fileMarkedForDeletion: Int.random(in: 0...9999),
+        fileDeleted: Int.random(in: 0...9999),
+      ),
+      collectionExport: CollectionExportResult(
+        folderInserted: Int.random(in: 0...9999),
+        folderUpdated: Int.random(in: 0...9999),
+        folderUnchanged: Int.random(in: 0...9999),
+        albumInserted: Int.random(in: 0...9999),
+        albumUpdated: Int.random(in: 0...9999),
+        albumUnchanged: Int.random(in: 0...9999),
+      ),
+      fileExport: FileExportResult(
+        copied: Int.random(in: 0...9999),
+        deleted: Int.random(in: 0...9999),
+      )
+    )
+  }
+
+  func createExportResultHistoryEntry(now: Date? = nil) -> ExportResultHistoryEntry {
+    return ExportResultHistoryEntry(
+      id: UUID().uuidString,
+      createdAt: now ?? Date(
+        timeIntervalSince1970: Double(Int.random(in: defaultDateStart...defaultDateEnd))
+      ),
+      exportResult: createExportResult(),
+      assetCount: Int.random(in: 0...9999),
+      fileCount: Int.random(in: 0...9999),
+      albumCount: Int.random(in: 0...9999),
+      folderCount: Int.random(in: 0...9999),
+    )
+  }
+
+  func createAndSaveExportResultHistoryEntry(now: Date? = nil) throws -> ExportResultHistoryEntry {
+    let entry = createExportResultHistoryEntry()
+    try exporterDB.insertExportResultHistoryEntry(entry: entry)
+    return entry
   }
 }

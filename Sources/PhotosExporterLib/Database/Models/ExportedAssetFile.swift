@@ -16,7 +16,7 @@ struct ExportedAssetFile: Codable, Equatable {
 
   func needsUpdate(_ other: ExportedAssetFile) -> Bool {
     return self.isDeleted != other.isDeleted
-      || !DateHelper.safeEquals(self.deletedAt, other.deletedAt)
+      || !DateHelper.secondsEquals(self.deletedAt, other.deletedAt)
   }
 
   func updated(_ from: ExportedAssetFile) -> ExportedAssetFile {
@@ -52,7 +52,7 @@ extension ExportedAssetFile: TableRecord, PersistableRecord, FetchableRecord {
   }
 
   static func createTable(_ db: Database) throws {
-    try db.create(table: "asset_file") { table in
+    try db.create(table: databaseTableName) { table in
       table.column("asset_id", .text).notNull().references("asset")
       table.column("file_id", .text).notNull().references("file")
       table.primaryKey(["asset_id", "file_id"])

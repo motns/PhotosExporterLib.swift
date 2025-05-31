@@ -249,7 +249,7 @@ struct AssetExporter {
   }
 }
 
-public struct AssetExportResult: Sendable, Equatable {
+public struct AssetExportResult: Codable, Sendable, Equatable {
   let assetInserted: Int
   let assetUpdated: Int
   let assetUnchanged: Int
