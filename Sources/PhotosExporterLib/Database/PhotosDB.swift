@@ -4,6 +4,7 @@ import Logging
 import GRDB
 
 protocol PhotosDBProtocol {
+  func getAllAssetScoresById() throws -> [String: Int64]
   func getAllAssetLocationsById() throws -> [String: PostalAddress]
 }
 
@@ -27,9 +28,31 @@ struct PhotosDB: PhotosDBProtocol {
     }
   }
 
+  func getAllAssetScoresById() throws -> [String: Int64] {
+    logger.debug("Loading Asset scores from Photos SQLite DB...")
+    var scoreById = [String: Int64]()
+
+    try dbQueue.read { db in
+      try Row.fetchAll(
+        db,
+        sql: """
+        SELECT
+          ZUUID AS uuid,
+          CAST(ZOVERALLAESTHETICSCORE * 1000000000 AS INTEGER) AS score
+        FROM ZASSET
+        """,
+      ).forEach { row in
+        if let score = row["score"] as? Int64 {
+          scoreById[row["uuid"]] = score
+        }
+      }
+    }
+
+    return scoreById
+  }
+
   func getAllAssetLocationsById() throws -> [String: PostalAddress] {
     logger.debug("Loading Asset locations from Photos SQLite DB...")
-
     var locationById = [String: PostalAddress]()
 
     try dbQueue.read { db in
@@ -44,7 +67,7 @@ struct PhotosDB: PhotosDBProtocol {
         FROM ZADDITIONALASSETATTRIBUTES AS attributes
           JOIN ZASSET AS asset ON attributes.ZASSET = asset.Z_PK
         WHERE attributes.ZREVERSELOCATIONDATAISVALID = 1
-        """
+        """,
       ).forEach { row in
         let uuid: String = row["uuid"]
 

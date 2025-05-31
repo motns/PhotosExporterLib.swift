@@ -84,6 +84,11 @@ final class PhotosExporterLibTests {
       // asset3 won't have location data
     ]
 
+    photosDBMock.assetScores = [
+      asset1.id: 702561736,
+      asset2.id: 0,
+    ]
+
     let album1 = dataGen.createPhotokitAlbum(
       collectionSubtype: .albumCloudShared,
       assetIds: [asset1.id],
@@ -105,6 +110,7 @@ final class PhotosExporterLibTests {
       asset: asset1,
       cityId: try cityLookup.getIdByName(name: "London"),
       countryId: try countryLookup.getIdByName(name: "United Kingdom"),
+      aestheticScore: 702561736,
       now: startTime,
     )!
     let exportedFile1 = ExportedFile.fromPhotokitAssetResource(
@@ -125,6 +131,7 @@ final class PhotosExporterLibTests {
       asset: asset2,
       cityId: try cityLookup.getIdByName(name: "Madrid"),
       countryId: try countryLookup.getIdByName(name: "Spain"),
+      aestheticScore: 0,
       now: startTime,
     )!
     let exportedFile2 = ExportedFile.fromPhotokitAssetResource(
@@ -145,6 +152,7 @@ final class PhotosExporterLibTests {
       asset: asset3,
       cityId: nil,
       countryId: nil,
+      aestheticScore: nil,
       now: startTime,
     )!
     let exportedFile3 = ExportedFile.fromPhotokitAssetResource(
@@ -409,11 +417,16 @@ final class PhotosExporterLibTests {
     let updatedAsset1 = asset1.copy(
       isFavourite: !asset1.isFavourite
     )
-    self.photokitMock.assets = [updatedAsset1, asset2, asset3]
+    photokitMock.assets = [updatedAsset1, asset2, asset3]
 
-    self.photosDBMock.assetLocations = [
+    photosDBMock.assetLocations = [
       asset1.id: dataGen.createPostalAddress(country: "United Kingdom", city: "London"),
       asset2.id: dataGen.createPostalAddress(country: "Hungary", city: "Budapest"),
+    ]
+
+    photosDBMock.assetScores = [
+      asset1.id: 808547258,
+      asset2.id: 0,
     ]
 
     let updatedAlbum1 = album1.copy(
@@ -426,6 +439,7 @@ final class PhotosExporterLibTests {
       asset: updatedAsset1,
       cityId: try cityLookup.getIdByName(name: "London"),
       countryId: try countryLookup.getIdByName(name: "United Kingdom"),
+      aestheticScore: 808547258,
       now: startTime,
     )!
 
@@ -433,6 +447,7 @@ final class PhotosExporterLibTests {
       asset: asset2,
       cityId: try cityLookup.getIdByName(name: "Budapest"),
       countryId: try countryLookup.getIdByName(name: "Hungary"),
+      aestheticScore: 0,
       now: startTime,
     )!
     let updatedExportedFile2 = ExportedFile.fromPhotokitAssetResource(
@@ -564,6 +579,7 @@ final class PhotosExporterLibTests {
       photokitAsset: asset1,
       cityId: nil,
       countryId: nil,
+      aestheticScore: nil,
       now: now,
     )
     let exportedFile1 = try dataGen.createAndSaveExportedFile(
@@ -583,6 +599,7 @@ final class PhotosExporterLibTests {
       photokitAsset: asset2,
       cityId: nil,
       countryId: nil,
+      aestheticScore: nil,
       now: now,
     )
     let exportedFile2 = try dataGen.createAndSaveExportedFile(
@@ -602,6 +619,7 @@ final class PhotosExporterLibTests {
       photokitAsset: assetToDeleteLater,
       cityId: nil,
       countryId: nil,
+      aestheticScore: nil,
       now: now,
     )
     let exportedFileToDeleteLaterAsset = try dataGen.createAndSaveExportedFile(
@@ -621,6 +639,7 @@ final class PhotosExporterLibTests {
       photokitAsset: asset3,
       cityId: nil,
       countryId: nil,
+      aestheticScore: nil,
       now: now,
     )
     let exportedFile3 = try dataGen.createAndSaveExportedFile(

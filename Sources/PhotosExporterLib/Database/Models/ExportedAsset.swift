@@ -34,6 +34,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
   let geoLong: Double?
   let cityId: Int64?
   let countryId: Int64?
+  let aestheticScore: Int64?
   let isDeleted: Bool
   let deletedAt: Date?
 
@@ -49,6 +50,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
     case geoLong = "geo_long"
     case cityId = "city_id"
     case countryId = "country_id"
+    case aestheticScore = "aesthetic_score"
     case isDeleted = "is_deleted"
     case deletedAt = "deleted_at"
   }
@@ -60,6 +62,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
       || self.geoLong != other.geoLong
       || self.cityId != other.cityId
       || self.countryId != other.countryId
+      || self.aestheticScore != other.aestheticScore
   }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
@@ -74,6 +77,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
       && lhs.geoLong == rhs.geoLong
       && lhs.cityId == rhs.cityId
       && lhs.countryId == rhs.countryId
+      && lhs.aestheticScore == rhs.aestheticScore
       && lhs.isDeleted == rhs.isDeleted
       && DateHelper.secondsEquals(lhs.deletedAt, rhs.deletedAt)
   }
@@ -90,6 +94,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
     geoLong: Double?? = nil,
     cityId: Int64? = nil,
     countryId: Int64? = nil,
+    aestheticScore: Int64? = nil,
     isDeleted: Bool? = nil,
     deletedAt: Date? = nil,
   ) -> ExportedAsset {
@@ -105,6 +110,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
       geoLong: geoLong ?? self.geoLong,
       cityId: cityId ?? self.cityId,
       countryId: countryId ?? self.countryId,
+      aestheticScore: aestheticScore ?? self.aestheticScore,
       isDeleted: isDeleted ?? self.isDeleted,
       deletedAt: deletedAt ?? self.deletedAt
     )
@@ -118,6 +124,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
       geoLong: from.geoLong,
       cityId: from.cityId,
       countryId: from.countryId,
+      aestheticScore: from.aestheticScore,
       isDeleted: false, // Implicitly False, since we're updating from a Photokit Asset
       deletedAt: nil
     )
@@ -127,6 +134,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
     asset: PhotokitAsset,
     cityId: Int64?,
     countryId: Int64?,
+    aestheticScore: Int64?,
     now: Date
   ) -> ExportedAsset? {
     guard let assetType = AssetType.fromPhotokitAssetMediaType(asset.assetMediaType) else {
@@ -147,6 +155,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
       geoLong: asset.geoLong,
       cityId: cityId,
       countryId: countryId,
+      aestheticScore: aestheticScore,
       isDeleted: false, // This is implicitly False, since we're creating it from a Photokit Asset
       deletedAt: nil
     )
@@ -167,6 +176,7 @@ extension ExportedAsset: Identifiable, TableRecord, PersistableRecord, Fetchable
     static let geoLong = Column(CodingKeys.geoLong)
     static let cityId = Column(CodingKeys.cityId)
     static let countryId = Column(CodingKeys.countryId)
+    static let aestheticScore = Column(CodingKeys.aestheticScore)
     static let isDeleted = Column(CodingKeys.isDeleted)
     static let deletedAt = Column(CodingKeys.deletedAt)
   }
@@ -184,6 +194,7 @@ extension ExportedAsset: Identifiable, TableRecord, PersistableRecord, Fetchable
       table.column("geo_long", .double)
       table.column("country_id", .integer).references("country")
       table.column("city_id", .integer).references("city")
+      table.column("aesthetic_score", .integer)
       table.column("is_deleted", .boolean).notNull()
       table.column("deleted_at", .datetime)
     }

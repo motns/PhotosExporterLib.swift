@@ -1,6 +1,7 @@
 import Foundation
 @testable import PhotosExporterLib
 
+// swiftlint:disable file_length
 // swiftlint:disable:next type_body_length
 struct TestDataGenerator {
   let exporterDB: ExporterDB
@@ -77,12 +78,14 @@ struct TestDataGenerator {
     photokitAsset: PhotokitAsset,
     cityId: Int64?,
     countryId: Int64?,
+    aestheticScore: Int64?,
     now: Date,
   ) -> ExportedAsset {
     return ExportedAsset.fromPhotokitAsset(
       asset: photokitAsset,
       cityId: cityId,
       countryId: countryId,
+      aestheticScore: aestheticScore,
       now: now,
     )!
   }
@@ -96,6 +99,7 @@ struct TestDataGenerator {
     isFavourite: Bool? = nil,
     city: String? = nil,
     country: String? = nil,
+    aestheticScore: Int64? = nil,
     isDeleted: Bool? = nil,
     deletedAt: Date? = nil,
   ) throws -> ExportedAsset {
@@ -135,6 +139,7 @@ struct TestDataGenerator {
       geoLong: Double.random(in: -180...180),
       cityId: cityId,
       countryId: countryId,
+      aestheticScore: aestheticScore ?? Int64.random(in: 1000000...9999999),
       isDeleted: isDeleted ?? false,
       deletedAt: deletedAt
     )
@@ -144,12 +149,14 @@ struct TestDataGenerator {
     photokitAsset: PhotokitAsset,
     cityId: Int64?,
     countryId: Int64?,
+    aestheticScore: Int64?,
     now: Date,
   ) throws -> ExportedAsset {
     let asset = ExportedAsset.fromPhotokitAsset(
       asset: photokitAsset,
       cityId: cityId,
       countryId: countryId,
+      aestheticScore: aestheticScore,
       now: now,
     )!
     _ = try exporterDB.upsertAsset(asset: asset)
@@ -165,6 +172,7 @@ struct TestDataGenerator {
     isFavourite: Bool? = nil,
     city: String? = nil,
     country: String? = nil,
+    aestheticScore: Int64? = nil,
     isDeleted: Bool? = nil,
     deletedAt: Date? = nil,
   ) throws -> ExportedAsset {
@@ -177,6 +185,7 @@ struct TestDataGenerator {
       isFavourite: isFavourite,
       city: city,
       country: country,
+      aestheticScore: aestheticScore,
       isDeleted: isDeleted,
       deletedAt: deletedAt,
     )

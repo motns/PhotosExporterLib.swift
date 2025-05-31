@@ -3,7 +3,9 @@ import Logging
 import Testing
 @testable import PhotosExporterLib
 
-@Suite("Photos DB tests")
+// There's some strange behaviour whereby for some reason the shared SQLite DB
+// is locked when these tests are run, so let's just run them serially for now
+@Suite("Photos DB tests", .serialized)
 final class PhotosDBTests {
   let photosDB: PhotosDB
 
@@ -21,8 +23,25 @@ final class PhotosDBTests {
     }
   }
 
+  @Test("Get all Asset scores by ID", .enabled(if: true))
+  func getAllAssetScoresById() throws {
+    let scoresById = try photosDB.getAllAssetScoresById()
+
+    let expected: [String: Int64] = [
+      "5DA77F31-E9E4-4613-BEAA-BA158E06FD0E": 500000000,
+      "A3CE313C-284F-4679-AE85-B89192DFCC8C": 500000000,
+      "8D3CC9F7-FAAA-4B04-A742-9669B75DECFC": 500000000,
+      "EA469F78-2332-425D-B3C0-51C93E78C112": 500000000,
+      "AEB097DA-DD3B-45E7-B19F-3F9145768E22": 702561736,
+      "FC48CB6F-9135-49AE-BB3C-2C11AC4CF97D": 808547258,
+      "A3891C03-91F5-4E01-B005-4E4F2DF63853": 814257144,
+      "EF45AD5A-5DE3-430E-AD0E-E8EF1A7E7A15": 830729365,
+    ]
+    #expect(scoresById == expected)
+  }
+
   @Test("Get all Asset locations by ID")
-  func getAllAssetLocationsById() async throws {
+  func getAllAssetLocationsById() throws {
     let locationsById = try photosDB.getAllAssetLocationsById()
 
     let expected = [

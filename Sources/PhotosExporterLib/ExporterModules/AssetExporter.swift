@@ -51,6 +51,7 @@ struct AssetExporter {
     logger.info("Exporting Assets to local DB...")
 
     let assetLocationById = try photosDB.getAllAssetLocationsById()
+    let assetScoreById = try photosDB.getAllAssetScoresById()
     let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
     var assetResults = [UpsertResult?]()
     var fileResults = [UpsertResult?]()
@@ -72,6 +73,7 @@ struct AssetExporter {
         asset: photokitAsset,
         cityId: cityIdOpt,
         countryId: countryIdOpt,
+        aestheticScore: assetScoreById[photokitAsset.uuid],
         now: self.timeProvider.getDate()
       )
       guard let exportedAsset = exportedAssetOpt else {

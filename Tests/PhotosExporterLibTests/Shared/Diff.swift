@@ -151,6 +151,7 @@ extension ExportedAsset: Diffable, DiffableStruct {
     out += propertyDiff("geoLong", self.geoLong, other.geoLong) ?? ""
     out += propertyDiff("cityId", self.cityId, other.cityId) ?? ""
     out += propertyDiff("countryId", self.countryId, other.countryId) ?? ""
+    out += propertyDiff("aestheticScore", self.aestheticScore, other.aestheticScore) ?? ""
     out += propertyDiff("isDeleted", self.isDeleted, other.isDeleted) ?? ""
     out += propertyDiff("deletedAt", self.deletedAt, other.deletedAt) { lhs, rhs in
       DateHelper.secondsEquals(lhs, rhs)
