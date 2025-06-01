@@ -168,6 +168,31 @@ extension ExporterDB {
     }
   }
 
+  func getFilesWithScore(threshold: Int64) throws -> [ExportedFileWithScore] {
+    try dbQueue.read { db in
+      try ExportedFileWithScore.fetchAll(
+        db,
+        sql: """
+        SELECT
+          file.*,
+          file_asset.score
+        FROM file
+          JOIN (
+            SELECT
+              asset_file.file_id,
+              MAX(asset.aesthetic_score) AS score
+            FROM asset_file
+              JOIN asset ON asset.id = asset_file.asset_id
+            GROUP BY asset_file.file_id
+          ) AS file_asset ON file_asset.file_id = file.id
+        WHERE
+          ? <= file_asset.score
+        """,
+        arguments: [threshold]
+      )
+    }
+  }
+
   func countFiles() throws -> Int {
     return try dbQueue.read { db in
       try ExportedFile.fetchCount(db)

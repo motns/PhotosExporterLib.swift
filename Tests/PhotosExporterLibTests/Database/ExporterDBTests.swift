@@ -222,6 +222,49 @@ final class ExporterDBTests {
     )
   }
 
+  @Test("Get files with score")
+  func getFilesWithScore() throws {
+    // Above threshold
+    let asset1 = try dataGen.createAndSaveExportedAsset(
+      aestheticScore: 910000000
+    )
+    let file1 = try dataGen.createAndSaveExportedFile(asset: asset1)
+    _ = try dataGen.createAndSaveAssetFile(assetId: asset1.id, fileId: file1.id)
+
+    // On threshold
+    let asset2 = try dataGen.createAndSaveExportedAsset(
+      aestheticScore: 900000000
+    )
+    let file2 = try dataGen.createAndSaveExportedFile(asset: asset2)
+    _ = try dataGen.createAndSaveAssetFile(assetId: asset2.id, fileId: file2.id)
+
+    // Below threshold
+    let asset3 = try dataGen.createAndSaveExportedAsset(
+      aestheticScore: 700000000
+    )
+    let file3 = try dataGen.createAndSaveExportedFile(asset: asset3)
+    _ = try dataGen.createAndSaveAssetFile(assetId: asset3.id, fileId: file3.id)
+
+    let filesWithScore = try exporterDB.getFilesWithScore(
+      threshold: 900000000
+    ).sorted { $0.exportedFile.id < $1.exportedFile.id }
+    let expected = [
+      ExportedFileWithScore(
+        exportedFile: file1,
+        score: 910000000
+      ),
+      ExportedFileWithScore(
+        exportedFile: file2,
+        score: 900000000
+      ),
+    ].sorted { $0.exportedFile.id < $1.exportedFile.id }
+
+    #expect(
+      filesWithScore == expected,
+      "\(Diff.getDiffAsString(filesWithScore, expected) ?? "")",
+    )
+  }
+
   @Test("Get Files with AssetIdsToCopy")
   func getFilesWithAssetIdsToCopy() throws {
     let (asset1, file1, _) = try dataGen.createAndSaveLinkedFile()

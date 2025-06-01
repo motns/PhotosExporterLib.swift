@@ -210,6 +210,17 @@ extension ExportedFileWithLocation: Diffable, DiffableStruct {
   }
 }
 
+extension ExportedFileWithScore: Diffable, DiffableStruct {
+  func getDiffAsString(_ other: ExportedFileWithScore) -> String? {
+    var out = ""
+    if let diff = self.exportedFile.getDiffAsString(other.exportedFile) {
+      out += diff
+    }
+    out += propertyDiff("score", self.score, other.score) ?? ""
+    return out
+  }
+}
+
 extension ExportedAssetFile: Diffable, DiffableStruct {
   func getDiffAsString(_ other: ExportedAssetFile) -> String? {
     var out = ""

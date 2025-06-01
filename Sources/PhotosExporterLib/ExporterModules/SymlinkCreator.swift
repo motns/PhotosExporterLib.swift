@@ -21,8 +21,10 @@ struct SymlinkCreator {
   private let albumsDirURL: URL
   private let filesDirURL: URL
   private let locationsDirURL: URL
+  private let topShotsDirURL: URL
   private let exporterDB: ExporterDB
   private let fileManager: ExporterFileManagerProtocol
+  private let scoreThreshold: Int64
   private let timeProvider: TimeProvider
   private let logger: ClassLogger
 
@@ -30,16 +32,20 @@ struct SymlinkCreator {
     albumsDirURL: URL,
     filesDirURL: URL,
     locationsDirURL: URL,
+    topShotsDirURL: URL,
     exporterDB: ExporterDB,
     fileManager: ExporterFileManagerProtocol,
+    scoreThreshold: Int64,
     timeProvider: TimeProvider,
     logger: Logger,
   ) {
     self.albumsDirURL = albumsDirURL
     self.filesDirURL = filesDirURL
     self.locationsDirURL = locationsDirURL
+    self.topShotsDirURL = topShotsDirURL
     self.exporterDB = exporterDB
     self.fileManager = fileManager
+    self.scoreThreshold = scoreThreshold
     self.timeProvider = timeProvider
     self.logger = ClassLogger(logger: logger, className: "SymlinkCreator")
   }
@@ -64,6 +70,9 @@ struct SymlinkCreator {
 
     logger.debug("Creating location symlinks...")
     try createLocationSymlinks()
+
+    logger.debug("Creating top shot symlinks...")
+    try createTopShotsSymlinks()
 
     logger.info("Symlink folders created in \(timeProvider.secondsPassedSince(startDate))s")
   }
@@ -196,6 +205,38 @@ struct SymlinkCreator {
         ])
       } else {
         logger.trace("Created symlink for file at geolocation", [
+          "file_id": "\(file.id)",
+          "link_src": "\(linkSrc.path(percentEncoded: false))",
+          "link_dest": "\(linkDest.path(percentEncoded: false))",
+        ])
+      }
+    }
+  }
+
+  private func createTopShotsSymlinks() throws {
+    let filesWithScore = try exporterDB.getFilesWithScore(threshold: scoreThreshold)
+    _ = try fileManager.createDirectory(url: topShotsDirURL)
+
+    for fileWithScore in filesWithScore {
+      let file = fileWithScore.exportedFile
+      logger.trace("Creating score symlink for file...", [
+        "file_id": "\(file.id)",
+      ])
+
+      let linkSrc = filesDirURL
+        .appending(path: file.importedFileDir)
+        .appending(path: file.importedFileName)
+      let linkDest = topShotsDirURL.appending(path: "\(fileWithScore.score)-\(file.importedFileName)")
+
+      let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
+      if res == .exists {
+        logger.trace("Symlink for file with score already exists", [
+          "file_id": "\(file.id)",
+          "link_src": "\(linkSrc.path(percentEncoded: false))",
+          "link_dest": "\(linkDest.path(percentEncoded: false))",
+        ])
+      } else {
+        logger.trace("Created symlink for file with score", [
           "file_id": "\(file.id)",
           "link_src": "\(linkSrc.path(percentEncoded: false))",
           "link_dest": "\(linkDest.path(percentEncoded: false))",

@@ -101,7 +101,7 @@ final class PhotosExporterLibTests {
     ]
 
     photosDBMock.assetScores = [
-      asset1.id: 702561736,
+      asset1.id: 902561736,
       asset2.id: 0,
     ]
 
@@ -126,7 +126,7 @@ final class PhotosExporterLibTests {
       asset: asset1,
       cityId: try cityLookup.getIdByName(name: "London"),
       countryId: try countryLookup.getIdByName(name: "United Kingdom"),
-      aestheticScore: 702561736,
+      aestheticScore: 902561736,
       now: startTime,
     )!
     let exportedFile1 = ExportedFile.fromPhotokitAssetResource(
@@ -168,7 +168,7 @@ final class PhotosExporterLibTests {
       asset: asset3,
       cityId: nil,
       countryId: nil,
-      aestheticScore: nil,
+      aestheticScore: 0,
       now: startTime,
     )!
     let exportedFile3 = ExportedFile.fromPhotokitAssetResource(
@@ -309,6 +309,7 @@ final class PhotosExporterLibTests {
 
     let albumDirURL = exportBaseDirURL.appending(path: "albums")
     let locationDirURL = exportBaseDirURL.appending(path: "locations")
+    let topshotsDirURL = exportBaseDirURL.appending(path: "top-shots")
     let expectedSymlinkCalls = [
       // Album symlinks
       CreateSymlinkCall(
@@ -361,16 +362,25 @@ final class PhotosExporterLibTests {
           .appending(path: DateHelper.getYearMonthStr(exportedAsset2.createdAt))
           .appending(path: exportedFile2.importedFileName),
       ),
-    ].sorted(by: { $0.src.absoluteString < $1.src.absoluteString })
+      // Top shots symlinks
+      CreateSymlinkCall(
+        src: fileDirURL
+          .appending(path: exportedFile1.importedFileDir)
+          .appending(path: exportedFile1.importedFileName),
+        dest: topshotsDirURL
+          .appending(
+            path: "\(exportedAsset1.aestheticScore)-\(exportedFile1.importedFileName)"
+          ),
+      ),
+    ].sorted(by: { $0.dest.absoluteString < $1.dest.absoluteString })
     let sortedMockSymlinkCalls = fileManagerMock
-      .createSymlinkCalls.sorted(by: { $0.src.absoluteString < $1.src.absoluteString })
+      .createSymlinkCalls.sorted(by: { $0.dest.absoluteString < $1.dest.absoluteString })
     #expect(
       sortedMockSymlinkCalls == expectedSymlinkCalls,
       "\(Diff.getDiffAsString(sortedMockSymlinkCalls, expectedSymlinkCalls) ?? "")"
     )
 
     let assetsInDB = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
-    // Avoid using Sets, because they use Hashable instead of Comparable
     #expect(
       assetsInDB == exportedAssets,
       "\(Diff.getDiffAsString(assetsInDB, exportedAssets) ?? "")"
@@ -620,7 +630,7 @@ final class PhotosExporterLibTests {
       photokitAsset: asset1,
       cityId: nil,
       countryId: nil,
-      aestheticScore: nil,
+      aestheticScore: 0,
       now: now,
     )
     let exportedFile1 = try dataGen.createAndSaveExportedFile(
@@ -640,7 +650,7 @@ final class PhotosExporterLibTests {
       photokitAsset: asset2,
       cityId: nil,
       countryId: nil,
-      aestheticScore: nil,
+      aestheticScore: 0,
       now: now,
     )
     let exportedFile2 = try dataGen.createAndSaveExportedFile(
@@ -660,7 +670,7 @@ final class PhotosExporterLibTests {
       photokitAsset: assetToDeleteLater,
       cityId: nil,
       countryId: nil,
-      aestheticScore: nil,
+      aestheticScore: 0,
       now: now,
     )
     let exportedFileToDeleteLaterAsset = try dataGen.createAndSaveExportedFile(
@@ -680,7 +690,7 @@ final class PhotosExporterLibTests {
       photokitAsset: asset3,
       cityId: nil,
       countryId: nil,
-      aestheticScore: nil,
+      aestheticScore: 0,
       now: now,
     )
     let exportedFile3 = try dataGen.createAndSaveExportedFile(

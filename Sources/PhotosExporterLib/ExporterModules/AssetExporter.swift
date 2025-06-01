@@ -89,7 +89,7 @@ struct AssetExporter {
         asset: photokitAsset,
         cityId: cityIdOpt,
         countryId: countryIdOpt,
-        aestheticScore: assetScoreById[photokitAsset.uuid],
+        aestheticScore: assetScoreById[photokitAsset.uuid] ?? 0,
         now: self.timeProvider.getDate()
       )
       guard let exportedAsset = exportedAssetOpt else {

@@ -20,9 +20,6 @@ import Logging
 
 public struct PhotosExporterLib {
   private let exportBaseDirURL: URL
-  private let albumsDirURL: URL
-  private let locationsDirURL: URL
-  private let filesDirURL: URL
   private let photokit: PhotokitProtocol
   private let exporterDB: ExporterDB
   private let fileManager: ExporterFileManagerProtocol
@@ -43,16 +40,19 @@ public struct PhotosExporterLib {
     logger: Logger,
     timeProvider: TimeProvider,
     expiryDays: Int = 30,
+    scoreThreshold: Int64 = 850000000,
   ) {
     self.exportBaseDirURL = URL(filePath: exportBaseDir)
-    self.albumsDirURL = exportBaseDirURL.appending(path: "albums")
-    self.filesDirURL = exportBaseDirURL.appending(path: "files")
-    self.locationsDirURL = exportBaseDirURL.appending(path: "locations")
     self.photokit = photokit
     self.exporterDB = exporterDB
     self.fileManager = fileManager
     self.logger = ClassLogger(logger: logger, className: "PhotosExporterLib")
     self.timeProvider = timeProvider
+
+    let albumsDirURL = exportBaseDirURL.appending(path: "albums")
+    let filesDirURL = exportBaseDirURL.appending(path: "files")
+    let locationsDirURL = exportBaseDirURL.appending(path: "locations")
+    let topShotsDirURL = exportBaseDirURL.appending(path: "top-shots")
 
     self.assetExporter = AssetExporter(
       exporterDB: exporterDB,
@@ -71,7 +71,7 @@ public struct PhotosExporterLib {
     )
 
     self.fileExporter = FileExporter(
-      exportBaseDirURL: self.exportBaseDirURL,
+      filesDirURL: filesDirURL,
       exporterDB: exporterDB,
       photokit: photokit,
       fileManager: self.fileManager,
@@ -80,11 +80,13 @@ public struct PhotosExporterLib {
     )
 
     self.symlinkCreator = SymlinkCreator(
-      albumsDirURL: self.albumsDirURL,
-      filesDirURL: self.filesDirURL,
-      locationsDirURL: self.locationsDirURL,
+      albumsDirURL: albumsDirURL,
+      filesDirURL: filesDirURL,
+      locationsDirURL: locationsDirURL,
+      topShotsDirURL: topShotsDirURL,
       exporterDB: exporterDB,
       fileManager: fileManager,
+      scoreThreshold: scoreThreshold,
       timeProvider: timeProvider,
       logger: logger,
     )
@@ -94,6 +96,7 @@ public struct PhotosExporterLib {
     exportBaseDir: String,
     logger: Logger? = nil,
     expiryDays: Int = 30,
+    scoreThreshold: Int64 = 850000000,
   ) async throws -> PhotosExporterLib {
     let loggerActual: Logger
 
@@ -133,6 +136,7 @@ public struct PhotosExporterLib {
       logger: loggerActual,
       timeProvider: DefaultTimeProvider.shared,
       expiryDays: expiryDays,
+      scoreThreshold: scoreThreshold,
     )
   }
 

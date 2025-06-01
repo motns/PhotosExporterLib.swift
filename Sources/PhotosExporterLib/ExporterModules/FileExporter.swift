@@ -26,14 +26,14 @@ struct FileExporter {
   private let logger: ClassLogger
 
   init(
-    exportBaseDirURL: URL,
+    filesDirURL: URL,
     exporterDB: ExporterDB,
     photokit: PhotokitProtocol,
     fileManager: ExporterFileManagerProtocol,
     timeProvider: TimeProvider,
     logger: Logger,
   ) {
-    self.filesDirURL = exportBaseDirURL.appending(path: "files")
+    self.filesDirURL = filesDirURL
     self.exporterDB = exporterDB
     self.photokit = photokit
     self.fileManager = fileManager

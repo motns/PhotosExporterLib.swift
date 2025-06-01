@@ -96,7 +96,7 @@ struct TestDataGenerator {
     photokitAsset: PhotokitAsset,
     cityId: Int64?,
     countryId: Int64?,
-    aestheticScore: Int64?,
+    aestheticScore: Int64,
     now: Date,
   ) -> ExportedAsset {
     return ExportedAsset.fromPhotokitAsset(
@@ -167,7 +167,7 @@ struct TestDataGenerator {
     photokitAsset: PhotokitAsset,
     cityId: Int64?,
     countryId: Int64?,
-    aestheticScore: Int64?,
+    aestheticScore: Int64,
     now: Date,
   ) throws -> ExportedAsset {
     let asset = ExportedAsset.fromPhotokitAsset(

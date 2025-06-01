@@ -50,7 +50,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
   let geoLong: Double?
   let cityId: Int64?
   let countryId: Int64?
-  let aestheticScore: Int64?
+  let aestheticScore: Int64
   let isDeleted: Bool
   let deletedAt: Date?
 
@@ -150,7 +150,7 @@ struct ExportedAsset: Codable, Equatable, Hashable {
     asset: PhotokitAsset,
     cityId: Int64?,
     countryId: Int64?,
-    aestheticScore: Int64?,
+    aestheticScore: Int64,
     now: Date
   ) -> ExportedAsset? {
     guard let assetType = AssetType.fromPhotokitAssetMediaType(asset.assetMediaType) else {
@@ -210,7 +210,7 @@ extension ExportedAsset: Identifiable, TableRecord, PersistableRecord, Fetchable
       table.column("geo_long", .double)
       table.column("country_id", .integer).references("country")
       table.column("city_id", .integer).references("city")
-      table.column("aesthetic_score", .integer)
+      table.column("aesthetic_score", .integer).notNull()
       table.column("is_deleted", .boolean).notNull()
       table.column("deleted_at", .datetime)
     }
