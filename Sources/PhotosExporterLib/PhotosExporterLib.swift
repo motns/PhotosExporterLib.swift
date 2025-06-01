@@ -5,6 +5,7 @@ import Logging
 public struct PhotosExporterLib {
   private let exportBaseDirURL: URL
   private let albumsDirURL: URL
+  private let locationsDirURL: URL
   private let filesDirURL: URL
   private let photokit: PhotokitProtocol
   private let exporterDB: ExporterDB
@@ -30,6 +31,7 @@ public struct PhotosExporterLib {
     self.exportBaseDirURL = URL(filePath: exportBaseDir)
     self.albumsDirURL = exportBaseDirURL.appending(path: "albums")
     self.filesDirURL = exportBaseDirURL.appending(path: "files")
+    self.locationsDirURL = exportBaseDirURL.appending(path: "locations")
     self.photokit = photokit
     self.exporterDB = exporterDB
     self.fileManager = fileManager
@@ -64,6 +66,7 @@ public struct PhotosExporterLib {
     self.symlinkCreator = SymlinkCreator(
       albumsDirURL: self.albumsDirURL,
       filesDirURL: self.filesDirURL,
+      locationsDirURL: self.locationsDirURL,
       exporterDB: exporterDB,
       fileManager: fileManager,
       timeProvider: timeProvider,

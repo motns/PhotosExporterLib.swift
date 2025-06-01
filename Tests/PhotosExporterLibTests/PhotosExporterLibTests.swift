@@ -292,7 +292,9 @@ final class PhotosExporterLibTests {
     )
 
     let albumDirURL = exportBaseDirURL.appending(path: "albums")
+    let locationDirURL = exportBaseDirURL.appending(path: "locations")
     let expectedSymlinkCalls = [
+      // Album symlinks
       CreateSymlinkCall(
         src: fileDirURL
           .appending(path: exportedFile1.importedFileDir)
@@ -319,6 +321,29 @@ final class PhotosExporterLibTests {
           .appending(path: FileHelper.normaliseForPath(exportedFolder2.name))
           .appending(path: FileHelper.normaliseForPath(exportedAlbum3.name))
           .appending(path: exportedFile3.importedFileName),
+      ),
+      // Location symlinks
+      CreateSymlinkCall(
+        src: fileDirURL
+          .appending(path: exportedFile1.importedFileDir)
+          .appending(path: exportedFile1.importedFileName),
+        dest: locationDirURL
+          .appending(path: FileHelper.normaliseForPath("United Kingdom"))
+          .appending(path: FileHelper.normaliseForPath("London"))
+          .appending(path: DateHelper.getYearStr(exportedAsset1.createdAt))
+          .appending(path: DateHelper.getYearMonthStr(exportedAsset1.createdAt))
+          .appending(path: exportedFile1.importedFileName),
+      ),
+      CreateSymlinkCall(
+        src: fileDirURL
+          .appending(path: exportedFile2.importedFileDir)
+          .appending(path: exportedFile2.importedFileName),
+        dest: locationDirURL
+          .appending(path: FileHelper.normaliseForPath("Spain"))
+          .appending(path: FileHelper.normaliseForPath("Madrid"))
+          .appending(path: DateHelper.getYearStr(exportedAsset2.createdAt))
+          .appending(path: DateHelper.getYearMonthStr(exportedAsset2.createdAt))
+          .appending(path: exportedFile2.importedFileName),
       ),
     ].sorted(by: { $0.src.absoluteString < $1.src.absoluteString })
     let sortedMockSymlinkCalls = fileManagerMock

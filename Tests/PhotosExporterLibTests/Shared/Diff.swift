@@ -177,6 +177,21 @@ extension ExportedFile: Diffable, DiffableStruct {
   }
 }
 
+extension ExportedFileWithLocation: Diffable, DiffableStruct {
+  func getDiffAsString(_ other: ExportedFileWithLocation) -> String? {
+    var out = ""
+    if let diff = self.exportedFile.getDiffAsString(other.exportedFile) {
+      out += diff
+    }
+    out += propertyDiff("createdAt", self.createdAt, other.createdAt) { lhs, rhs in
+      DateHelper.secondsEquals(lhs, rhs)
+    } ?? ""
+    out += propertyDiff("country", self.country, other.country) ?? ""
+    out += propertyDiff("city", self.city, other.city) ?? ""
+    return out
+  }
+}
+
 extension ExportedAssetFile: Diffable, DiffableStruct {
   func getDiffAsString(_ other: ExportedAssetFile) -> String? {
     var out = ""

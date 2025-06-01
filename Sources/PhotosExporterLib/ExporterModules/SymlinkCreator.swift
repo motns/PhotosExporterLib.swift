@@ -4,6 +4,7 @@ import Logging
 struct SymlinkCreator {
   private let albumsDirURL: URL
   private let filesDirURL: URL
+  private let locationsDirURL: URL
   private let exporterDB: ExporterDB
   private let fileManager: ExporterFileManagerProtocol
   private let timeProvider: TimeProvider
@@ -12,6 +13,7 @@ struct SymlinkCreator {
   init(
     albumsDirURL: URL,
     filesDirURL: URL,
+    locationsDirURL: URL,
     exporterDB: ExporterDB,
     fileManager: ExporterFileManagerProtocol,
     timeProvider: TimeProvider,
@@ -19,6 +21,7 @@ struct SymlinkCreator {
   ) {
     self.albumsDirURL = albumsDirURL
     self.filesDirURL = filesDirURL
+    self.locationsDirURL = locationsDirURL
     self.exporterDB = exporterDB
     self.fileManager = fileManager
     self.timeProvider = timeProvider
@@ -31,7 +34,7 @@ struct SymlinkCreator {
       return
     }
 
-    logger.info("Removing and recreating Album folders...")
+    logger.info("Removing and recreating symlink folders...")
     let startDate = timeProvider.getDate()
 
     _ = try fileManager.remove(url: albumsDirURL)
@@ -42,7 +45,11 @@ struct SymlinkCreator {
       folderId: Photokit.RootFolderId,
       folderDirURL: albumsDirURL,
     )
-    logger.info("Albums folders created in \(timeProvider.secondsPassedSince(startDate))s")
+
+    logger.debug("Creating location symlinks...")
+    try createLocationSymlinks()
+
+    logger.info("Symlink folders created in \(timeProvider.secondsPassedSince(startDate))s")
   }
 
   private func createAlbumFolderSymlinks(folderId: String, folderDirURL: URL) throws {
@@ -106,7 +113,6 @@ struct SymlinkCreator {
           let linkSrc = filesDirURL
             .appending(path: file.importedFileDir)
             .appending(path: file.importedFileName)
-
           let linkDest = albumDirURL.appending(path: file.importedFileName)
 
           let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
@@ -128,6 +134,55 @@ struct SymlinkCreator {
         logger.warning("Cannot convert Album name to path-safe version - skipping", [
           "album_id": "\(album.id)",
           "name": "\(album.name)",
+        ])
+      }
+    }
+  }
+
+  private func createLocationSymlinks() throws {
+    let filesWithLocation = try exporterDB.getFilesWithLocation()
+
+    for fileWithLocation in filesWithLocation {
+      let file = fileWithLocation.exportedFile
+      logger.trace("Creating location symlink for file...", [
+        "file_id": "\(file.id)",
+      ])
+
+      let country = FileHelper.normaliseForPath(fileWithLocation.country)
+      guard !country.isEmpty else {
+        logger.warning("Cannot convert country name to path-safe version - skipping...", [
+          "file_id": "\(file.id)",
+          "country": "\(country)",
+        ])
+        continue
+      }
+      let city = FileHelper.normaliseForPath(fileWithLocation.city ?? "unknown")
+
+      let dirURL = locationsDirURL
+        .appending(path: country)
+        .appending(path: city)
+        .appending(path: DateHelper.getYearStr(fileWithLocation.createdAt))
+        .appending(path: DateHelper.getYearMonthStr(fileWithLocation.createdAt))
+
+      _ = try fileManager.createDirectory(url: dirURL)
+
+      let linkSrc = filesDirURL
+        .appending(path: file.importedFileDir)
+        .appending(path: file.importedFileName)
+      let linkDest = dirURL.appending(path: file.importedFileName)
+
+      let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
+      if res == .exists {
+        logger.trace("Symlink for file at geolocation already exists", [
+          "file_id": "\(file.id)",
+          "link_src": "\(linkSrc.path(percentEncoded: false))",
+          "link_dest": "\(linkDest.path(percentEncoded: false))",
+        ])
+      } else {
+        logger.trace("Created symlink for file at geolocation", [
+          "file_id": "\(file.id)",
+          "link_src": "\(linkSrc.path(percentEncoded: false))",
+          "link_dest": "\(linkDest.path(percentEncoded: false))",
         ])
       }
     }

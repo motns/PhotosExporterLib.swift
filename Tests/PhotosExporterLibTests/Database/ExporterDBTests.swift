@@ -152,6 +152,60 @@ final class ExporterDBTests {
     )
   }
 
+  @Test("Get files with location")
+  func getFilesWithLocation() throws {
+    let asset1 = try dataGen.createAndSaveExportedAsset(
+      createdAt: TestHelpers.dateFromStr("2025-03-01 12:00:00"),
+      city: "Madrid",
+      country: "Spain",
+    )
+    let file1 = try dataGen.createAndSaveExportedFile(asset: asset1)
+    _ = try dataGen.createAndSaveAssetFile(assetId: asset1.id, fileId: file1.id)
+
+    let asset2 = try dataGen.createAndSaveExportedAsset(
+      createdAt: TestHelpers.dateFromStr("2025-03-02 12:00:00"),
+      city: "London",
+      country: "United Kingdom",
+    )
+    // Have two Assets point to the same file, to test the grouping in the query
+    let asset3 = try dataGen.createAndSaveExportedAsset(
+      createdAt: TestHelpers.dateFromStr("2025-03-03 12:00:00"),
+      city: "London",
+      country: "United Kingdom",
+    )
+    let file2 = try dataGen.createAndSaveExportedFile(asset: asset2)
+    _ = try dataGen.createAndSaveAssetFile(assetId: asset2.id, fileId: file2.id)
+    _ = try dataGen.createAndSaveAssetFile(assetId: asset3.id, fileId: file2.id)
+
+    let asset4 = try dataGen.createAndSaveExportedAsset(
+      createdAt: TestHelpers.dateFromStr("2025-03-01 12:00:00"),
+    )
+    let file3 = try dataGen.createAndSaveExportedFile(asset: asset4)
+    _ = try dataGen.createAndSaveAssetFile(assetId: asset4.id, fileId: file3.id)
+
+    let filesWithLocation = try exporterDB.getFilesWithLocation()
+      .sorted { $0.exportedFile.id < $1.exportedFile.id }
+    let expected = [
+      ExportedFileWithLocation(
+        exportedFile: file1,
+        createdAt: asset1.createdAt,
+        country: "Spain",
+        city: "Madrid",
+      ),
+      ExportedFileWithLocation(
+        exportedFile: file2,
+        createdAt: asset2.createdAt,
+        country: "United Kingdom",
+        city: "London",
+      ),
+    ].sorted { $0.exportedFile.id < $1.exportedFile.id }
+
+    #expect(
+      filesWithLocation == expected,
+      "\(Diff.getDiffAsString(filesWithLocation, expected) ?? "")",
+    )
+  }
+
   @Test("Get Files with AssetIdsToCopy")
   func getFilesWithAssetIdsToCopy() throws {
     let (asset1, file1, _) = try dataGen.createAndSaveLinkedFile()

@@ -4,7 +4,7 @@ import Testing
 
 @Suite("File Helper tests")
 struct FileHelperTests {
-  @Test(arguments: [
+  @Test("Path for Date and Location", arguments: [
     ("2025-04-15 10:30:05", Optional<String>.none, Optional<String>.none, "2025/2025-04"),
     ("2025-04-15 10:30:05", "Spain", Optional<String>.none, "2025/2025-04-spain"),
     ("2025-04-15 10:30:05", "Spain", "Dénia", "2025/2025-04-spain-denia"),
@@ -21,7 +21,7 @@ struct FileHelperTests {
     #expect(res == out)
   }
 
-  @Test(arguments: [
+  @Test("Filename with Date and Edited", arguments: [
     ("IMG004.jpg", "2025-04-15 10:30:05", false, "20250415103005-img004.jpg"),
     ("IMG004.jpg", "2025-04-15 10:30:05", true, "20250415103005-img004_edited.jpg"),
     ("Peter's awesome image-1.jpg", "2025-04-15 10:30:05", false, "20250415103005-peters_awesome_image1.jpg"),
@@ -37,7 +37,7 @@ struct FileHelperTests {
     #expect(res == out)
   }
 
-  @Test(arguments: [
+  @Test("Normalise for Path", arguments: [
     ("London", "london"),
     ("Dénia", "denia"),
     ("United Kingdom", "united_kingdom"),
@@ -50,22 +50,44 @@ struct FileHelperTests {
 
 @Suite("Date Helper tests")
 struct DateHelperTests {
-  @Test("Safe Equals")
-  func secondsEquals() {
+  @Test("Safe Equals", arguments: [
+    (Date(timeIntervalSince1970: 1269099904), Date(timeIntervalSince1970: 1269099904), true),
+    (Date(timeIntervalSince1970: 1269099904.123), Date(timeIntervalSince1970: 1269099904.456), true),
+    (nil as Date?, Date(timeIntervalSince1970: 1269099904), false),
+    (Date(timeIntervalSince1970: 1269099904), nil as Date?, false),
+    (nil as Date?, nil as Date?, true),
+  ])
+  func secondsEquals(
+    _ date1: Date?,
+    _ date2: Date?,
+    _ result: Bool,
+  ) {
+    #expect(DateHelper.secondsEquals(date1, date2) == result)
+  }
 
-    #expect(DateHelper.secondsEquals(
-      Date(timeIntervalSince1970: 1269099904),
-      Date(timeIntervalSince1970: 1269099904),
-    ) == true)
+  @Test("Get year string", arguments: [
+    (TestHelpers.dateFromStr("2025-03-15 12:00:00"), "2025"),
+    (nil as Date?, "0000"),
+  ])
+  func getYearStr(_ date: Date?, _ out: String) {
+    #expect(DateHelper.getYearStr(date) == out)
+  }
 
-    #expect(DateHelper.secondsEquals(
-      Date(timeIntervalSince1970: 1269099904.123),
-      Date(timeIntervalSince1970: 1269099904.456),
-    ) == true)
+  @Test("Get month string", arguments: [
+    (TestHelpers.dateFromStr("2025-03-15 12:00:00"), "03"),
+    (TestHelpers.dateFromStr("2025-12-15 12:00:00"), "12"),
+    (nil as Date?, "00"),
+  ])
+  func getMonthStr(_ date: Date?, _ out: String) {
+    #expect(DateHelper.getMonthStr(date) == out)
+  }
 
-    #expect(DateHelper.secondsEquals(
-      Date(timeIntervalSince1970: 1269099904),
-      Date(timeIntervalSince1970: 1269099905),
-    ) == false)
+  @Test("Get year-month string", arguments: [
+    (TestHelpers.dateFromStr("2025-03-15 12:00:00"), "2025-03"),
+    (TestHelpers.dateFromStr("2025-12-15 12:00:00"), "2025-12"),
+    (nil as Date?, "0000-00"),
+  ])
+  func getYearMonthStr(_ date: Date?, _ out: String) {
+    #expect(DateHelper.getYearMonthStr(date) == out)
   }
 }

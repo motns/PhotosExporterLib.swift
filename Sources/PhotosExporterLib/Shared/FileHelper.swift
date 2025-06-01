@@ -57,22 +57,6 @@ struct FileHelper {
   }
 }
 
-struct DateHelper {
-  static func secondsEquals(_ date1: Date, _ date2: Date) -> Bool {
-    return Int(date1.timeIntervalSince1970) == Int(date2.timeIntervalSince1970)
-  }
-
-  static func secondsEquals(_ date1: Date?, _ date2: Date?) -> Bool {
-    return switch (date1, date2) {
-    case (.none, .none): true
-    case (.none, .some(_)): false
-    case (.some(_), .none): false
-    case (.some(let date1), .some(let date2)):
-      secondsEquals(date1, date2)
-    }
-  }
-}
-
 enum FileHelperError: Error {
   case fileExistsAtDirectoryPath(String)
 }

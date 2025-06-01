@@ -122,6 +122,36 @@ extension ExporterDB {
     }
   }
 
+  func getFilesWithLocation() throws -> [ExportedFileWithLocation] {
+    try dbQueue.read { db in
+      try ExportedFileWithLocation.fetchAll(
+        db,
+        sql: """
+        SELECT
+          file.*,
+          file_asset.created_at,
+          file_asset.country,
+          file_asset.city
+        FROM file
+          JOIN (
+            SELECT
+              asset_file.file_id,
+              MIN(asset.created_at) AS created_at,
+              MIN(city.name) AS city,
+              MIN(country.name) AS country
+            FROM asset_file
+              JOIN asset ON asset.id = asset_file.asset_id
+              LEFT JOIN country ON country.id = asset.country_id
+              LEFT JOIN city ON city.id = asset.city_id
+            GROUP BY asset_file.file_id
+          ) AS file_asset ON file_asset.file_id = file.id
+        WHERE
+          file_asset.country IS NOT NULL
+        """
+      )
+    }
+  }
+
   func countFiles() throws -> Int {
     return try dbQueue.read { db in
       try ExportedFile.fetchCount(db)
