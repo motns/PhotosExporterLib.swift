@@ -167,6 +167,8 @@ extension ExportedFile: Diffable, DiffableStruct {
     out += propertyDiff("fileType", self.fileType, other.fileType) ?? ""
     out += propertyDiff("originalFileName", self.originalFileName, other.originalFileName) ?? ""
     out += propertyDiff("fileSize", self.fileSize, other.fileSize) ?? ""
+    out += propertyDiff("pixelHeight", self.pixelHeight, other.pixelHeight) ?? ""
+    out += propertyDiff("pixelWidth", self.pixelWidth, other.pixelWidth) ?? ""
     out += propertyDiff("importedAt", self.importedAt, other.importedAt) { lhs, rhs in
       DateHelper.secondsEquals(lhs, rhs)
     } ?? ""

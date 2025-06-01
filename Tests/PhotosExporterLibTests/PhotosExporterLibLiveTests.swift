@@ -69,5 +69,7 @@ final class PhotosExporterLibLiveTests {
 
     let initialRes = try await photosExporterLib.export()
     #expect(initialRes == expectedInitialRes)
+
+    // TODO - check actual DB contents here
   }
 }

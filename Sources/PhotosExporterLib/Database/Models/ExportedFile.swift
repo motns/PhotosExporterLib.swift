@@ -38,6 +38,8 @@ struct ExportedFile: Codable, Equatable, Hashable {
   let fileType: FileType
   let originalFileName: String
   let fileSize: Int64
+  let pixelHeight: Int64
+  let pixelWidth: Int64
   let importedAt: Date
   let importedFileDir: String
   let importedFileName: String
@@ -48,6 +50,8 @@ struct ExportedFile: Codable, Equatable, Hashable {
     case fileType = "file_type_id"
     case originalFileName = "original_file_name"
     case fileSize = "file_size"
+    case pixelHeight = "pixel_height"
+    case pixelWidth = "pixel_width"
     case importedAt = "imported_at"
     case importedFileDir = "imported_file_dir"
     case importedFileName = "imported_file_name"
@@ -70,6 +74,8 @@ struct ExportedFile: Codable, Equatable, Hashable {
     return self.importedFileDir != other.importedFileDir
       || self.importedFileName != other.importedFileName
       || self.fileSize != other.fileSize
+      || self.pixelHeight != other.pixelHeight
+      || self.pixelWidth != other.pixelWidth
       // It shouldn't be possible to unset the "copied" flag
       || self.wasCopied != newWasCopied
   }
@@ -79,6 +85,8 @@ struct ExportedFile: Codable, Equatable, Hashable {
       && lhs.fileType == rhs.fileType
       && lhs.originalFileName == rhs.originalFileName
       && lhs.fileSize == rhs.fileSize
+      && lhs.pixelHeight == rhs.pixelHeight
+      && lhs.pixelWidth == rhs.pixelWidth
       && DateHelper.secondsEquals(lhs.importedAt, rhs.importedAt)
       && lhs.importedFileDir == rhs.importedFileDir
       && lhs.importedFileName == rhs.importedFileName
@@ -100,6 +108,8 @@ struct ExportedFile: Codable, Equatable, Hashable {
 
     return self.copy(
       fileSize: from.fileSize,
+      pixelHeight: from.pixelHeight,
+      pixelWidth: from.pixelWidth,
       importedFileDir: from.importedFileDir,
       importedFileName: from.importedFileName,
       // It shouldn't normally be possible to unset the "copied" flag
@@ -112,6 +122,8 @@ struct ExportedFile: Codable, Equatable, Hashable {
     fileType: FileType? = nil,
     originalFileName: String? = nil,
     fileSize: Int64? = nil,
+    pixelHeight: Int64? = nil,
+    pixelWidth: Int64? = nil,
     importedAt: Date? = nil,
     importedFileDir: String? = nil,
     importedFileName: String? = nil,
@@ -122,6 +134,8 @@ struct ExportedFile: Codable, Equatable, Hashable {
       fileType: fileType ?? self.fileType,
       originalFileName: originalFileName ?? self.originalFileName,
       fileSize: fileSize ?? self.fileSize,
+      pixelHeight: pixelHeight ?? self.pixelHeight,
+      pixelWidth: pixelWidth ?? self.pixelWidth,
       importedAt: importedAt ?? self.importedAt,
       importedFileDir: importedFileDir ?? self.importedFileDir,
       importedFileName: importedFileName ?? self.importedFileName,
@@ -166,6 +180,8 @@ struct ExportedFile: Codable, Equatable, Hashable {
       fileType: fileType,
       originalFileName: resource.originalFileName,
       fileSize: resource.fileSize,
+      pixelHeight: resource.pixelHeight,
+      pixelWidth: resource.pixelWidth,
       importedAt: now ?? Date(),
       importedFileDir: FileHelper.pathForDateAndLocation(
         dateOpt: asset.createdAt,
@@ -189,6 +205,9 @@ extension ExportedFile: Identifiable, TableRecord, PersistableRecord, FetchableR
     static let id = Column(CodingKeys.id)
     static let fileType = Column(CodingKeys.fileType)
     static let originalFileName = Column(CodingKeys.originalFileName)
+    static let fileSize = Column(CodingKeys.fileSize)
+    static let pixelHeight = Column(CodingKeys.pixelHeight)
+    static let pixelWidth = Column(CodingKeys.pixelWidth)
     static let importedAt = Column(CodingKeys.importedAt)
     static let importedFileDir = Column(CodingKeys.importedFileDir)
     static let importedFileName = Column(CodingKeys.importedFileName)
@@ -201,6 +220,8 @@ extension ExportedFile: Identifiable, TableRecord, PersistableRecord, FetchableR
       table.column("file_type_id", .integer).notNull().references("file_type")
       table.column("original_file_name", .text).notNull()
       table.column("file_size", .integer).notNull()
+      table.column("pixel_height", .integer).notNull()
+      table.column("pixel_width", .integer).notNull()
       table.column("imported_at", .datetime).notNull()
       table.column("imported_file_dir", .text).notNull()
       table.column("imported_file_name", .text).notNull()

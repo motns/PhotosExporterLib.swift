@@ -92,6 +92,8 @@ struct PhotokitAssetResource: Sendable {
   let assetResourceType: PhotokitAssetResourceType
   let originalFileName: String
   let fileSize: Int64
+  let pixelHeight: Int64
+  let pixelWidth: Int64
 
   static func fromPHAssetResource(
     resource: PHAssetResource,
@@ -101,6 +103,8 @@ struct PhotokitAssetResource: Sendable {
       assetResourceType: PhotokitAssetResourceType.fromPHAssetResourceType(assetResourceType: resource.type),
       originalFileName: resource.originalFilename,
       fileSize: fileSize,
+      pixelHeight: Int64(resource.pixelHeight),
+      pixelWidth: Int64(resource.pixelWidth),
     )
   }
 }

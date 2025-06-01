@@ -33,7 +33,9 @@ struct TestDataGenerator {
     return PhotokitAssetResource(
       assetResourceType: assetResourceType ?? .photo,
       originalFileName: "IMG_\(Int.random(in: 0...99999)).png",
-      fileSize: Int64.random(in: 1000...99999)
+      fileSize: Int64.random(in: 1000...99999),
+      pixelHeight: Int64.random(in: 100...5000),
+      pixelWidth: Int64.random(in: 100...4000),
     )
   }
 
@@ -215,6 +217,8 @@ struct TestDataGenerator {
     fileType: FileType? = nil,
     originalFileName: String? = nil,
     fileSize: Int64? = nil,
+    pixelHeight: Int64? = nil,
+    pixelWidth: Int64? = nil,
     importedAt: Date? = nil,
     city: String? = nil,
     country: String? = nil,
@@ -226,6 +230,8 @@ struct TestDataGenerator {
       fileType: fileType ?? FileType.originalImage,
       originalFileName: originalFileName ?? randomFileName,
       fileSize: fileSize ?? Int64.random(in: 1000000...99999999),
+      pixelHeight: pixelHeight ?? Int64.random(in: 100...5000),
+      pixelWidth: pixelWidth ?? Int64.random(in: 100...4000),
       importedAt: importedAt ?? TestHelpers.dateFromStr("2025-03-15 11:30:05")!,
       importedFileDir: FileHelper.pathForDateAndLocation(
         dateOpt: asset.createdAt,
@@ -246,6 +252,8 @@ struct TestDataGenerator {
     fileType: FileType? = nil,
     originalFileName: String? = nil,
     fileSize: Int64? = nil,
+    pixelHeight: Int64? = nil,
+    pixelWidth: Int64? = nil,
     importedAt: Date? = nil,
     city: String? = nil,
     country: String? = nil,
@@ -256,6 +264,8 @@ struct TestDataGenerator {
       fileType: fileType,
       originalFileName: originalFileName,
       fileSize: fileSize,
+      pixelHeight: pixelHeight,
+      pixelWidth: pixelWidth,
       importedAt: importedAt,
       city: city,
       country: country,
