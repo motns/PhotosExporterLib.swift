@@ -18,6 +18,8 @@ jobs:
     - name: Build
       run: swift build -v
     - name: Lint
-      run: swiftlint --reporter github-actions-logging --strict
+      uses: cirruslabs/swiftlint-action@v1
+      with:
+        version: latest
     - name: Run tests
       run: swift test -v
