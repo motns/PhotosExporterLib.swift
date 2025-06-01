@@ -74,11 +74,11 @@ public struct PhotosExporterLib {
     )
   }
 
-  init(
+  public static func create(
     exportBaseDir: String,
     logger: Logger? = nil,
     expiryDays: Int = 30,
-  ) async throws {
+  ) async throws -> PhotosExporterLib {
     let loggerActual: Logger
 
     if let customLogger = logger {
@@ -99,13 +99,13 @@ public struct PhotosExporterLib {
         classLogger.trace("Export folder created")
       }
 
-      try PhotosExporterLib.copyPhotosDB(exportBaseDir: exportBaseDir, logger: classLogger)
+      try self.copyPhotosDB(exportBaseDir: exportBaseDir, logger: classLogger)
     } catch {
       classLogger.critical("Failed to set up Exporter directory")
       throw error
     }
 
-    self.init(
+    return PhotosExporterLib(
       exportBaseDir: exportBaseDir,
       photokit: try await Photokit(logger: loggerActual),
       exporterDB: try ExporterDB(

@@ -27,7 +27,7 @@ final class PhotosExporterLibLiveTests {
       logger: logger,
     )
 
-    self.photosExporterLib = try await PhotosExporterLib(
+    self.photosExporterLib = try await PhotosExporterLib.create(
       exportBaseDir: testDir,
       logger: logger,
     )
