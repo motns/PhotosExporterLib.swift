@@ -419,6 +419,7 @@ final class PhotosExporterLibTests {
       fileCount: 3,
       albumCount: 3,
       folderCount: 3,
+      fileSizeTotal: exportedFiles.reduce(0) { sum, curr in sum + curr.fileSize },
     )
 
     #expect(
@@ -832,6 +833,7 @@ final class PhotosExporterLibTests {
       fileCount: 7,
       albumCount: 0,
       folderCount: 1,
+      fileSizeTotal: exportedFiles.reduce(0) { sum, curr in sum + curr.fileSize },
     )
 
     #expect(
@@ -882,6 +884,7 @@ final class PhotosExporterLibTests {
       fileCount: 7,
       albumCount: 0,
       folderCount: 1,
+      fileSizeTotal: exportedFiles.reduce(0) { sum, curr in sum + curr.fileSize },
     )
 
     #expect(
@@ -923,22 +926,6 @@ final class PhotosExporterLibTests {
       "\(deleteRes.getDiffAsString(expectedDelete) ?? "")"
     )
 
-    let historyEntryInDBDelete = try photosExporterLib.lastRun()
-    let expectedHistoryEntryDelete = HistoryEntry(
-      id: historyEntryInDBDelete!.id,
-      createdAt: timeProvider.getDate(),
-      exportResult: deleteRes,
-      assetCount: 4,
-      fileCount: 5,
-      albumCount: 0,
-      folderCount: 1,
-    )
-
-    #expect(
-      historyEntryInDBDelete == expectedHistoryEntryDelete,
-      "\(historyEntryInDBDelete?.getDiffAsString(expectedHistoryEntryDelete) ?? "")",
-    )
-
     let exportedAssetsAfterDelete = [
       exportedAsset1,
       exportedAsset2,
@@ -976,6 +963,23 @@ final class PhotosExporterLibTests {
     #expect(
       assetFilesInDBAfterDelete == assetFilesAfterDelete,
       "\(Diff.getDiffAsString(assetFilesInDBAfterDelete, assetFilesAfterDelete) ?? "")"
+    )
+
+    let historyEntryInDBDelete = try photosExporterLib.lastRun()
+    let expectedHistoryEntryDelete = HistoryEntry(
+      id: historyEntryInDBDelete!.id,
+      createdAt: timeProvider.getDate(),
+      exportResult: deleteRes,
+      assetCount: 4,
+      fileCount: 5,
+      albumCount: 0,
+      folderCount: 1,
+      fileSizeTotal: filesInDBAfterDelete.reduce(0) { sum, curr in sum + curr.fileSize },
+    )
+
+    #expect(
+      historyEntryInDBDelete == expectedHistoryEntryDelete,
+      "\(historyEntryInDBDelete?.getDiffAsString(expectedHistoryEntryDelete) ?? "")",
     )
 
     let fileDirURL = exportBaseDirURL.appending(path: "files")
@@ -1056,6 +1060,7 @@ final class PhotosExporterLibTests {
       fileCount: 5,
       albumCount: 0,
       folderCount: 1,
+      fileSizeTotal: filesInDBAfterDelete.reduce(0) { sum, curr in sum + curr.fileSize },
     )
 
     #expect(
@@ -1098,22 +1103,6 @@ final class PhotosExporterLibTests {
       "\(deleteRes2.getDiffAsString(expectedDelete2) ?? "")"
     )
 
-    let historyEntryInDBDelete2 = try photosExporterLib.lastRun()
-    let expectedHistoryEntryDelete2 = HistoryEntry(
-      id: historyEntryInDBDelete2!.id,
-      createdAt: timeProvider.getDate(),
-      exportResult: deleteRes2,
-      assetCount: 3,
-      fileCount: 3,
-      albumCount: 0,
-      folderCount: 1,
-    )
-
-    #expect(
-      historyEntryInDBDelete2 == expectedHistoryEntryDelete2,
-      "\(historyEntryInDBDelete2?.getDiffAsString(expectedHistoryEntryDelete2) ?? "")",
-    )
-
     let exportedAssetsAfterDelete2 = [
       exportedAsset1,
       exportedAsset2,
@@ -1146,6 +1135,23 @@ final class PhotosExporterLibTests {
     #expect(
       assetFilesInDBAfterDelete2 == assetFilesAfterDelete2,
       "\(Diff.getDiffAsString(assetFilesInDBAfterDelete2, assetFilesAfterDelete2) ?? "")"
+    )
+
+    let historyEntryInDBDelete2 = try photosExporterLib.lastRun()
+    let expectedHistoryEntryDelete2 = HistoryEntry(
+      id: historyEntryInDBDelete2!.id,
+      createdAt: timeProvider.getDate(),
+      exportResult: deleteRes2,
+      assetCount: 3,
+      fileCount: 3,
+      albumCount: 0,
+      folderCount: 1,
+      fileSizeTotal: filesInDBAfterDelete2.reduce(0) { sum, curr in sum + curr.fileSize },
+    )
+
+    #expect(
+      historyEntryInDBDelete2 == expectedHistoryEntryDelete2,
+      "\(historyEntryInDBDelete2?.getDiffAsString(expectedHistoryEntryDelete2) ?? "")",
     )
 
     let expectedRemoveCalls2 = [

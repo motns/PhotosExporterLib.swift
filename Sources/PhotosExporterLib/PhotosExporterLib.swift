@@ -218,6 +218,7 @@ public struct PhotosExporterLib {
     let fileCount = try exporterDB.countFiles()
     let albumCount = try exporterDB.countAlbums()
     let folderCount = try exporterDB.countFolders()
+    let fileSizeTotal = try exporterDB.sumFileSizes()
 
     let historyEntry = ExportResultHistoryEntry(
       id: UUID().uuidString,
@@ -226,7 +227,8 @@ public struct PhotosExporterLib {
       assetCount: assetCount,
       fileCount: fileCount,
       albumCount: albumCount,
-      folderCount: folderCount
+      folderCount: folderCount,
+      fileSizeTotal: fileSizeTotal ?? 0,
     )
     _ = try exporterDB.insertExportResultHistoryEntry(entry: historyEntry)
 

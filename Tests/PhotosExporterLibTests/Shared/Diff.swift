@@ -327,6 +327,7 @@ extension ExportResultHistoryEntry: Diffable, DiffableStruct {
     out += propertyDiff("file_count", self.fileCount, other.fileCount) ?? ""
     out += propertyDiff("album_count", self.albumCount, other.albumCount) ?? ""
     out += propertyDiff("folder_count", self.folderCount, other.folderCount) ?? ""
+    out += propertyDiff("fileSizeTotal", self.fileSizeTotal, other.fileSizeTotal) ?? ""
     return out != "" ? out : nil
   }
 }
@@ -345,6 +346,7 @@ extension HistoryEntry: Diffable, DiffableStruct {
     out += propertyDiff("file_count", self.fileCount, other.fileCount) ?? ""
     out += propertyDiff("album_count", self.albumCount, other.albumCount) ?? ""
     out += propertyDiff("folder_count", self.folderCount, other.folderCount) ?? ""
+    out += propertyDiff("fileSizeTotal", self.fileSizeTotal, other.fileSizeTotal) ?? ""
     return out != "" ? out : nil
   }
 }
@@ -358,5 +360,6 @@ extension HistoryEntry: Equatable {
       && lhs.fileCount == rhs.fileCount
       && lhs.albumCount == rhs.albumCount
       && lhs.folderCount == rhs.folderCount
+      && lhs.fileSizeTotal == rhs.fileSizeTotal
   }
 }

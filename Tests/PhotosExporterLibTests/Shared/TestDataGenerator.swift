@@ -471,6 +471,7 @@ struct TestDataGenerator {
       fileCount: Int.random(in: 0...9999),
       albumCount: Int.random(in: 0...9999),
       folderCount: Int.random(in: 0...9999),
+      fileSizeTotal: Int64.random(in: 10000...9999999),
     )
   }
 

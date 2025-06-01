@@ -199,6 +199,19 @@ extension ExporterDB {
     }
   }
 
+  func sumFileSizes() throws -> Int64? {
+    return try dbQueue.read { db in
+      return try Int64.fetchOne(
+        db,
+        sql: """
+        SELECT
+          SUM(file_size)
+        FROM file
+        """
+      )
+    }
+  }
+
   func getFileIdSet() throws -> Set<String> {
     return try dbQueue.read { db in
       try String.fetchSet(

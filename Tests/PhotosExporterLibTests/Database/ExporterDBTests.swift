@@ -80,6 +80,16 @@ final class ExporterDBTests {
     #expect(res == 9)
   }
 
+  @Test("Sum file sizes")
+  func sumFileSizes() throws {
+    let (_, file1, _) = try dataGen.createAndSaveLinkedFile()
+    let (_, file2, _) = try dataGen.createAndSaveLinkedFile()
+    let (_, file3, _) = try dataGen.createAndSaveLinkedFile()
+    let expected = file1.fileSize + file2.fileSize + file3.fileSize
+    let sum = try exporterDB.sumFileSizes()
+    #expect(sum == expected)
+  }
+
   @Test("Count Folders")
   func countFolders() throws {
     try (1...7).forEach { _ in
