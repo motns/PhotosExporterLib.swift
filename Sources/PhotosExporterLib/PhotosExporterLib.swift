@@ -220,6 +220,7 @@ public struct PhotosExporterLib {
     let folderCount = try exporterDB.countFolders()
     let fileSizeTotal = try exporterDB.sumFileSizes()
 
+    let runTime = timeProvider.secondsPassedSince(startDate)
     let historyEntry = ExportResultHistoryEntry(
       id: UUID().uuidString,
       createdAt: timeProvider.getDate(),
@@ -229,10 +230,11 @@ public struct PhotosExporterLib {
       albumCount: albumCount,
       folderCount: folderCount,
       fileSizeTotal: fileSizeTotal ?? 0,
+      runTime: Decimal(runTime),
     )
     _ = try exporterDB.insertExportResultHistoryEntry(entry: historyEntry)
 
-    logger.info("Export complete in \(timeProvider.secondsPassedSince(startDate))s")
+    logger.info("Export complete in \(runTime)s")
     return exportResult
   }
 }

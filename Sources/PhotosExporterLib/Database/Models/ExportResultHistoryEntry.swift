@@ -26,6 +26,7 @@ struct ExportResultHistoryEntry: Codable {
   let albumCount: Int
   let folderCount: Int
   let fileSizeTotal: Int64
+  let runTime: Decimal
 
   enum CodingKeys: String, CodingKey {
     case id
@@ -36,6 +37,7 @@ struct ExportResultHistoryEntry: Codable {
     case albumCount = "album_count"
     case folderCount = "folder_count"
     case fileSizeTotal = "file_size_total"
+    case runTime = "run_time"
   }
 
   func copy(
@@ -47,6 +49,7 @@ struct ExportResultHistoryEntry: Codable {
     albumCount: Int? = nil,
     folderCount: Int? = nil,
     fileSizeTotal: Int64? = nil,
+    runTime: Decimal? = nil,
   ) -> ExportResultHistoryEntry {
     return ExportResultHistoryEntry(
       id: id ?? self.id,
@@ -57,6 +60,7 @@ struct ExportResultHistoryEntry: Codable {
       albumCount: albumCount ?? self.albumCount,
       folderCount: folderCount ?? self.folderCount,
       fileSizeTotal: fileSizeTotal ?? self.fileSizeTotal,
+      runTime: runTime ?? self.runTime,
     )
   }
 
@@ -70,6 +74,7 @@ struct ExportResultHistoryEntry: Codable {
       albumCount: self.albumCount,
       folderCount: self.folderCount,
       fileSizeTotal: self.fileSizeTotal,
+      runTime: self.runTime,
     )
   }
 
@@ -81,17 +86,19 @@ struct ExportResultHistoryEntry: Codable {
     albumCount: Int,
     folderCount: Int,
     fileSizeTotal: Int64,
-    now: Date? = nil,
+    now: Date,
+    runTime: Decimal,
   ) -> ExportResultHistoryEntry {
     return ExportResultHistoryEntry(
       id: UUID().uuidString,
-      createdAt: now ?? Date(),
+      createdAt: now,
       exportResult: exportResult,
       assetCount: assetCount,
       fileCount: fileCount,
       albumCount: albumCount,
       folderCount: folderCount,
       fileSizeTotal: fileSizeTotal,
+      runTime: runTime,
     )
   }
 }
@@ -123,6 +130,7 @@ extension ExportResultHistoryEntry: Identifiable, FetchableRecord, PersistableRe
     static let albumCount = Column(CodingKeys.albumCount)
     static let folderCount = Column(CodingKeys.folderCount)
     static let fileSizeTotal = Column(CodingKeys.fileSizeTotal)
+    static let runTime = Column(CodingKeys.runTime)
   }
 
   static func createTable(_ db: Database) throws {
@@ -135,6 +143,7 @@ extension ExportResultHistoryEntry: Identifiable, FetchableRecord, PersistableRe
       table.column("album_count", .integer).notNull()
       table.column("folder_count", .integer).notNull()
       table.column("file_size_total", .integer).notNull()
+      table.column("run_time", .text).notNull()
     }
   }
 }
@@ -150,6 +159,8 @@ public struct HistoryEntry {
   let albumCount: Int
   let folderCount: Int
   let fileSizeTotal: Int64
+  let runTime: Decimal
+}
 
 extension HistoryEntry: DiffableStruct {
   func getStructDiff(_ other: HistoryEntry) -> StructDiff {

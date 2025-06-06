@@ -834,6 +834,7 @@ final class PhotosExporterLibTests {
       albumCount: 0,
       folderCount: 1,
       fileSizeTotal: exportedFiles.reduce(0) { sum, curr in sum + curr.fileSize },
+      runTime: historyEntryInDBMark!.runTime,
     )
 
     #expect(
@@ -885,6 +886,7 @@ final class PhotosExporterLibTests {
       albumCount: 0,
       folderCount: 1,
       fileSizeTotal: exportedFiles.reduce(0) { sum, curr in sum + curr.fileSize },
+      runTime: historyEntryInDBNoChange!.runTime,
     )
 
     #expect(
@@ -975,6 +977,7 @@ final class PhotosExporterLibTests {
       albumCount: 0,
       folderCount: 1,
       fileSizeTotal: filesInDBAfterDelete.reduce(0) { sum, curr in sum + curr.fileSize },
+      runTime: historyEntryInDBDelete!.runTime,
     )
 
     #expect(
@@ -1061,6 +1064,7 @@ final class PhotosExporterLibTests {
       albumCount: 0,
       folderCount: 1,
       fileSizeTotal: filesInDBAfterDelete.reduce(0) { sum, curr in sum + curr.fileSize },
+      runTime: historyEntryInDBMark2!.runTime,
     )
 
     #expect(
@@ -1147,6 +1151,7 @@ final class PhotosExporterLibTests {
       albumCount: 0,
       folderCount: 1,
       fileSizeTotal: filesInDBAfterDelete2.reduce(0) { sum, curr in sum + curr.fileSize },
+      runTime: historyEntryInDBDelete2!.runTime,
     )
 
     #expect(
