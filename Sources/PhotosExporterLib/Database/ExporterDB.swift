@@ -146,23 +146,21 @@ extension ExporterDB {
         SELECT
           file.*,
           file_asset.created_at,
-          file_asset.country,
-          file_asset.city
+          country.name As country,
+          city.name As city
         FROM file
+          LEFT JOIN country ON country.id = file.country_id
+          LEFT JOIN city ON city.id = file.city_id
           JOIN (
             SELECT
               asset_file.file_id,
-              MIN(asset.created_at) AS created_at,
-              MIN(city.name) AS city,
-              MIN(country.name) AS country
+              MIN(asset.created_at) AS created_at
             FROM asset_file
               JOIN asset ON asset.id = asset_file.asset_id
-              LEFT JOIN country ON country.id = asset.country_id
-              LEFT JOIN city ON city.id = asset.city_id
             GROUP BY asset_file.file_id
           ) AS file_asset ON file_asset.file_id = file.id
         WHERE
-          file_asset.country IS NOT NULL
+          file.country_id IS NOT NULL
         """
       )
     }
@@ -439,15 +437,12 @@ extension ExporterDB {
         }
 
         logger.trace("Asset changed - updating...", loggerMetadata)
-        try curr.updated(from: asset).update(db)
+        let updated = curr.updated(from: asset)
+        try updated.update(db)
 
         logger.trace("Asset updated", [
-          "asset_id": "\(asset.id)",
-          "is_favourite": "\(asset.isFavourite)",
-          "geo_lat": "\(String(describing: asset.geoLat))",
-          "geo_long": "\(String(describing: asset.geoLong))",
-          "city_id": "\(String(describing: asset.cityId))",
-          "country_id": "\(String(describing: asset.countryId))",
+          "id": "\(asset.id)",
+          "diff": "\(Diff.getDiff(curr, updated))",
         ])
 
         return UpsertResult.update
@@ -478,14 +473,11 @@ extension ExporterDB {
 
         logger.trace("File changed - updating...", loggerMetadata)
         let updated = curr.updated(file)
-        try curr.updated(file).update(db)
+        try updated.update(db)
 
         logger.trace("File updated", [
           "id": "\(updated.id)",
-          "imported_file_dir": "\(updated.importedFileDir)",
-          "imported_file_name": "\(updated.importedFileName)",
-          "file_size": "\(updated.fileSize)",
-          "was_copied": "\(updated.wasCopied)",
+          "diff": "\(Diff.getDiff(curr, updated))",
         ])
 
         return UpsertResult.update
@@ -519,13 +511,13 @@ extension ExporterDB {
         }
 
         logger.trace("Asset File link changed - updating...", loggerMetadata)
-        try curr.updated(assetFile).update(db)
+        let updated = curr.updated(assetFile)
+        try updated.update(db)
 
         logger.trace("Asset File link updated", [
           "asset_id": "\(assetFile.assetId)",
           "file_id": "\(assetFile.fileId)",
-          "is_deleted": "\(assetFile.isDeleted)",
-          "deleted_at": "\(String(describing: assetFile.deletedAt))",
+          "diff": "\(Diff.getDiff(curr, updated))",
         ])
 
         return UpsertResult.update
@@ -553,12 +545,12 @@ extension ExporterDB {
         }
 
         logger.trace("Folder changed - updating...", loggerMetadata)
-        try curr.updated(folder).update(db)
+        let updated = curr.updated(folder)
+        try updated.update(db)
 
         logger.trace("Folder updated", [
-          "folder_id": "\(folder.id)",
-          "folder_name": "\(folder.name)",
-          "parent_id": "\(String(describing: folder.parentId))",
+          "id": "\(folder.id)",
+          "diff": "\(Diff.getDiff(curr, updated))",
         ])
         return UpsertResult.update
       } else {
@@ -587,7 +579,13 @@ extension ExporterDB {
         }
 
         logger.trace("Album changed - updating...", loggerMetadata)
-        try curr.updated(album).update(db)
+        let updated = curr.updated(album)
+        try updated.update(db)
+
+        logger.trace("Album updated", [
+          "id": "\(album.id)",
+          "diff": "\(Diff.getDiff(curr, updated))",
+        ])
         return UpsertResult.update
       } else {
         try album.insert(db)

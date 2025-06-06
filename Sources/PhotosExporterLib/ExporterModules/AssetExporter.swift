@@ -73,22 +73,20 @@ struct AssetExporter {
     var fileResults = [UpsertResult?]()
 
     while let photokitAsset = try await allPhotokitAssetsResult.next() {
-      let assetLocationOpt = assetLocationById[photokitAsset.uuid]
+      let assetLocation = assetLocationById[photokitAsset.uuid]
 
-      let (countryOpt, countryIdOpt): (String?, Int64?) = switch assetLocationOpt?.country {
+      let (country, countryId): (String?, Int64?) = switch assetLocation?.country {
       case .none: (nil, nil)
       case .some(let country): (country, try countryLookup.getIdByName(name: country))
       }
 
-      let (cityOpt, cityIdOpt): (String?, Int64?) = switch assetLocationOpt?.city {
+      let (city, cityId): (String?, Int64?) = switch assetLocation?.city {
       case .none: (nil, nil)
       case .some(let city): (city, try cityLookup.getIdByName(name: city))
       }
 
       let exportedAssetOpt = ExportedAsset.fromPhotokitAsset(
         asset: photokitAsset,
-        cityId: cityIdOpt,
-        countryId: countryIdOpt,
         aestheticScore: assetScoreById[photokitAsset.uuid] ?? 0,
         now: self.timeProvider.getDate()
       )
@@ -106,8 +104,10 @@ struct AssetExporter {
         fileResults.append(try processResource(
           asset: photokitAsset,
           resource: photokitResource,
-          countryOpt: countryOpt,
-          cityOpt: cityOpt
+          countryId: countryId,
+          cityId: cityId,
+          country: country,
+          city: city,
         ))
       }
     }
@@ -115,11 +115,14 @@ struct AssetExporter {
     return sumUpsertResults(assetResults: assetResults, fileResults: fileResults)
   }
 
+  // swiftlint:disable:next function_parameter_count
   private func processResource(
     asset: PhotokitAsset,
     resource: PhotokitAssetResource,
-    countryOpt: String?,
-    cityOpt: String?,
+    countryId: Int64?,
+    cityId: Int64?,
+    country: String?,
+    city: String?,
   ) throws -> UpsertResult? {
     // Filter out supplementary files like adjustment data
     guard FileType.fromPhotokitAssetResourceType(resource.assetResourceType) != nil else {
@@ -137,9 +140,11 @@ struct AssetExporter {
     let exportedFileOpt = ExportedFile.fromPhotokitAssetResource(
       asset: asset,
       resource: resource,
-      countryOpt: countryOpt,
-      cityOpt: cityOpt,
-      now: timeProvider.getDate()
+      now: timeProvider.getDate(),
+      countryId: countryId,
+      cityId: cityId,
+      country: country,
+      city: city,
     )
 
     guard let exportedFile = exportedFileOpt else {
@@ -177,7 +182,10 @@ struct AssetExporter {
       exportedAssetIds.remove(asset.id)
 
       for resource in asset.resources {
-        let id = ExportedFile.generateId(asset: asset, resource: resource)
+        let id = ExportedFile.generateId(
+          asset: asset,
+          resource: resource
+        )
         exportedFileIds.remove(id)
       }
     }

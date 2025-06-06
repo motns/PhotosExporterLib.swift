@@ -137,8 +137,8 @@ struct SymlinkCreator {
         for file in try exporterDB.getFilesForAlbum(albumId: album.id) {
           let linkSrc = filesDirURL
             .appending(path: file.importedFileDir)
-            .appending(path: file.importedFileName)
-          let linkDest = albumDirURL.appending(path: file.importedFileName)
+            .appending(path: file.id)
+          let linkDest = albumDirURL.appending(path: file.id)
 
           let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
           if res == .exists {
@@ -193,8 +193,8 @@ struct SymlinkCreator {
 
       let linkSrc = filesDirURL
         .appending(path: file.importedFileDir)
-        .appending(path: file.importedFileName)
-      let linkDest = dirURL.appending(path: file.importedFileName)
+        .appending(path: file.id)
+      let linkDest = dirURL.appending(path: file.id)
 
       let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
       if res == .exists {
@@ -225,8 +225,8 @@ struct SymlinkCreator {
 
       let linkSrc = filesDirURL
         .appending(path: file.importedFileDir)
-        .appending(path: file.importedFileName)
-      let linkDest = topShotsDirURL.appending(path: "\(fileWithScore.score)-\(file.importedFileName)")
+        .appending(path: file.id)
+      let linkDest = topShotsDirURL.appending(path: "\(fileWithScore.score)-\(file.id)")
 
       let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
       if res == .exists {

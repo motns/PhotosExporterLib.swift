@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import Photos
 
-enum PhotokitAssetMediaType: Int, Sendable {
+enum PhotokitAssetMediaType: Int, Sendable, SingleValueDiffable {
   case unknown = 0
   case image = 1
   case video = 2
@@ -41,8 +41,8 @@ struct PhotokitAsset: Sendable {
   let createdAt: Date?
   let updatedAt: Date?
   let isFavourite: Bool
-  let geoLat: Double?
-  let geoLong: Double?
+  let geoLat: Decimal?
+  let geoLong: Decimal?
   let resources: [PhotokitAssetResource]
 
   var uuid: String {
@@ -56,8 +56,8 @@ struct PhotokitAsset: Sendable {
     createdAt: Date?? = nil,
     updatedAt: Date?? = nil,
     isFavourite: Bool? = nil,
-    geoLat: Double?? = nil,
-    geoLong: Double?? = nil,
+    geoLat: Decimal?? = nil,
+    geoLong: Decimal?? = nil,
     resources: [PhotokitAssetResource]? = nil
   ) -> PhotokitAsset {
     PhotokitAsset(
@@ -87,8 +87,12 @@ struct PhotokitAsset: Sendable {
       createdAt: asset.creationDate,
       updatedAt: asset.modificationDate,
       isFavourite: asset.isFavorite,
-      geoLat: asset.location?.coordinate.latitude,
-      geoLong: asset.location?.coordinate.longitude,
+      geoLat: asset.location.map { loc in
+        Decimal(loc.coordinate.latitude).rounded(scale: 6)
+      },
+      geoLong: asset.location.map { loc in
+        Decimal(loc.coordinate.longitude).rounded(scale: 6)
+      },
       resources: resources,
     )
   }

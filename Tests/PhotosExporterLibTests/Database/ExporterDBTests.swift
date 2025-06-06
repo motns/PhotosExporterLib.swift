@@ -106,7 +106,7 @@ final class ExporterDBTests {
     let asset2 = try dataGen.createAndSaveExportedAsset()
     let asset3 = try dataGen.createAndSaveExportedAsset()
     // Assets marked as deleted should not show up in results
-    let asset4 = try dataGen.createExportedAsset(isDeleted: true)
+    let asset4 = dataGen.createExportedAsset(isDeleted: true)
     _ = try exporterDB.upsertAsset(asset: asset4)
 
     let expected = Set([asset1.id, asset2.id, asset3.id])
@@ -185,24 +185,26 @@ final class ExporterDBTests {
   func getFilesWithLocation() throws {
     let asset1 = try dataGen.createAndSaveExportedAsset(
       createdAt: TestHelpers.dateFromStr("2025-03-01 12:00:00"),
-      city: "Madrid",
-      country: "Spain",
     )
-    let file1 = try dataGen.createAndSaveExportedFile(asset: asset1)
+    let file1 = try dataGen.createAndSaveExportedFile(
+      asset: asset1,
+      country: "Spain",
+      city: "Madrid",
+    )
     _ = try dataGen.createAndSaveAssetFile(assetId: asset1.id, fileId: file1.id)
 
     let asset2 = try dataGen.createAndSaveExportedAsset(
       createdAt: TestHelpers.dateFromStr("2025-03-02 12:00:00"),
-      city: "London",
-      country: "United Kingdom",
     )
     // Have two Assets point to the same file, to test the grouping in the query
     let asset3 = try dataGen.createAndSaveExportedAsset(
       createdAt: TestHelpers.dateFromStr("2025-03-03 12:00:00"),
-      city: "London",
-      country: "United Kingdom",
     )
-    let file2 = try dataGen.createAndSaveExportedFile(asset: asset2)
+    let file2 = try dataGen.createAndSaveExportedFile(
+      asset: asset2,
+      country: "United Kingdom",
+      city: "London",
+    )
     _ = try dataGen.createAndSaveAssetFile(assetId: asset2.id, fileId: file2.id)
     _ = try dataGen.createAndSaveAssetFile(assetId: asset3.id, fileId: file2.id)
 
@@ -283,7 +285,7 @@ final class ExporterDBTests {
     let (asset1, file1, _) = try dataGen.createAndSaveLinkedFile()
     let (asset2, file2, _) = try dataGen.createAndSaveLinkedFile()
 
-    let file3 = dataGen.createExportedFile(asset: asset2).copy(
+    let file3 = try dataGen.createExportedFile(asset: asset2).copy(
       wasCopied: true
     )
     _ = try exporterDB.upsertFile(file: file3)
@@ -309,9 +311,13 @@ final class ExporterDBTests {
   @Test("Get Files for Album")
   // swiftlint:disable:next function_body_length
   func getFilesForAlbum() throws {
-    let asset1 = try dataGen.createExportedAsset()
+    let asset1 = dataGen.createExportedAsset()
     _ = try self.exporterDB.upsertAsset(asset: asset1)
-    let file1 = dataGen.createExportedFile(asset: asset1, city: "London", country: "United Kingdom")
+    let file1 = try dataGen.createExportedFile(
+      asset: asset1,
+      country: "United Kingdom",
+      city: "London",
+    )
     _ = try self.exporterDB.upsertFile(file: file1)
     _ = try self.exporterDB.upsertAssetFile(assetFile: ExportedAssetFile(
       assetId: asset1.id,
@@ -320,9 +326,13 @@ final class ExporterDBTests {
       deletedAt: nil,
     ))
 
-    let asset2 = try dataGen.createExportedAsset()
+    let asset2 = dataGen.createExportedAsset()
     _ = try self.exporterDB.upsertAsset(asset: asset2)
-    let file2 = dataGen.createExportedFile(asset: asset2, city: "Madrid", country: "Spain")
+    let file2 = try dataGen.createExportedFile(
+      asset: asset2,
+      country: "Spain",
+      city: "Madrid",
+    )
     _ = try self.exporterDB.upsertFile(file: file2)
     _ = try self.exporterDB.upsertAssetFile(assetFile: ExportedAssetFile(
       assetId: asset2.id,
@@ -331,9 +341,13 @@ final class ExporterDBTests {
       deletedAt: nil,
     ))
 
-    let asset3 = try dataGen.createExportedAsset()
+    let asset3 = dataGen.createExportedAsset()
     _ = try self.exporterDB.upsertAsset(asset: asset3)
-    let file3 = dataGen.createExportedFile(asset: asset3, city: "Budapest", country: "Hungary")
+    let file3 = try dataGen.createExportedFile(
+      asset: asset3,
+      country: "Hungary",
+      city: "Budapest",
+    )
     _ = try self.exporterDB.upsertFile(file: file3)
     _ = try self.exporterDB.upsertAssetFile(assetFile: ExportedAssetFile(
       assetId: asset3.id,
@@ -398,9 +412,11 @@ final class ExporterDBTests {
     #expect(res == expected)
   }
 
+  // - MARK: Updates
+
   @Test("Upsert Asset - New")
   func upsertAssetNew() throws {
-    let newAsset = try dataGen.createExportedAsset()
+    let newAsset = dataGen.createExportedAsset()
     let insertRes = try self.exporterDB.upsertAsset(asset: newAsset)
     #expect(insertRes == UpsertResult.insert)
 
@@ -410,7 +426,7 @@ final class ExporterDBTests {
 
   @Test("Upsert Asset - Update")
   func upsertAssetUpdate() throws {
-    let asset = try dataGen.createExportedAsset(
+    let asset = dataGen.createExportedAsset(
       isFavourite: false
     )
 
@@ -428,12 +444,14 @@ final class ExporterDBTests {
 
   @Test("Upsert File - New")
   func upsertFileNew() throws {
-    let city = "London"
-    let country = "United Kingdom"
-    let asset = try dataGen.createExportedAsset(city: city, country: country)
+    let asset = dataGen.createExportedAsset()
     _ = try self.exporterDB.upsertAsset(asset: asset)
 
-    let newFile = dataGen.createExportedFile(asset: asset, city: city, country: country)
+    let newFile = try dataGen.createExportedFile(
+      asset: asset,
+      country: "United Kingdom",
+      city: "London",
+    )
     let insertRes = try self.exporterDB.upsertFile(file: newFile)
     #expect(insertRes == UpsertResult.insert)
 
@@ -446,12 +464,14 @@ final class ExporterDBTests {
 
   @Test("Upsert File - Update")
   func upsertFileUpdate() throws {
-    let city = "London"
-    let country = "United Kingdom"
-    let asset = try dataGen.createExportedAsset(city: city, country: country)
+    let asset = dataGen.createExportedAsset()
     _ = try self.exporterDB.upsertAsset(asset: asset)
 
-    let newFile = dataGen.createExportedFile(asset: asset, city: city, country: country)
+    let newFile = try dataGen.createExportedFile(
+      asset: asset,
+      country: "United Kingdom",
+      city: "London",
+    )
     let insertRes = try self.exporterDB.upsertFile(file: newFile)
     #expect(insertRes == UpsertResult.insert)
 
@@ -462,10 +482,97 @@ final class ExporterDBTests {
     #expect(updatedToCheck == updatedFile)
   }
 
+  @Test("Upsert File - Changing location")
+  func upsertFileChangingLocation() throws {
+    let asset = try dataGen.createAndSaveExportedAsset()
+    let newFile = try dataGen.createAndSaveExportedFile(
+      asset: asset,
+      country: nil,
+      city: nil,
+      wasCopied: true,
+    )
+
+    let fileWithLocation = newFile.copy(
+      geoLat: Decimal(string: "40.423325"),
+      geoLong: Decimal(string: "-3.694627"),
+      countryId: try exporterDB.getLookupTableIdByName(table: .country, name: "Spain"),
+      cityId: try exporterDB.getLookupTableIdByName(table: .city, name: "Madrid"),
+      importedFileDir: "2025/2025-03_spain_madrid",
+      wasCopied: false, // Location change resets copied flag
+    )
+    _ = try exporterDB.upsertFile(file: fileWithLocation)
+    let fileWithLocationInDB = try exporterDB.getFile(id: newFile.id)
+    #expect(
+      fileWithLocationInDB == fileWithLocation,
+      "\(fileWithLocationInDB.diff(fileWithLocation).prettyDescription)"
+    )
+
+    let fileRemovedLocation = fileWithLocation.copy(
+      geoLat: nil,
+      geoLong: nil,
+      countryId: .some(nil),
+      cityId: .some(nil),
+      importedFileDir: "2025/2025-03",
+    )
+    _ = try exporterDB.upsertFile(file: fileRemovedLocation)
+    let fileRemovedLocationInDB = try exporterDB.getFile(id: newFile.id)
+    #expect(
+      fileRemovedLocationInDB == fileWithLocation, // Should be unchanged
+      "\(fileRemovedLocationInDB.diff(fileWithLocation).prettyDescription)",
+    )
+
+    let fileChangedLocation = fileWithLocation.copy(
+      geoLat: Decimal(string: "47.507047"),
+      geoLong: Decimal(string: "19.047039"),
+      countryId: try exporterDB.getLookupTableIdByName(table: .country, name: "Hungary"),
+      cityId: try exporterDB.getLookupTableIdByName(table: .city, name: "Budapest"),
+      importedFileDir: "2025/2025-03_hungary_budapest",
+    )
+    _ = try exporterDB.upsertFile(file: fileChangedLocation)
+    let fileChangedLocationInDB = try exporterDB.getFile(id: newFile.id)
+    #expect(
+      fileChangedLocationInDB == fileChangedLocation,
+      "\(fileChangedLocationInDB.diff(fileChangedLocation).prettyDescription)",
+    )
+  }
+
+  @Test("Upsert File - Protect wasCopied")
+  func upsertFileProtectWasCopied() throws {
+    let asset = try dataGen.createAndSaveExportedAsset()
+    let newFile = try dataGen.createAndSaveExportedFile(
+      asset: asset,
+      country: nil,
+      city: nil,
+      wasCopied: false,
+    )
+
+    // Allow going from `false` to `true`
+    let copiedFile = newFile.copy(
+      wasCopied: true
+    )
+    _ = try exporterDB.upsertFile(file: copiedFile)
+    let copiedFileInDB = try exporterDB.getFile(id: newFile.id)
+    #expect(
+      copiedFileInDB == copiedFile,
+      "\(copiedFileInDB.diff(copiedFile).prettyDescription)"
+    )
+
+    // Don't allow going from `true` to `false`
+    let uncopiedFile = newFile.copy(
+      wasCopied: false
+    )
+    _ = try exporterDB.upsertFile(file: uncopiedFile)
+    let uncopiedFileInDB = try exporterDB.getFile(id: newFile.id)
+    #expect(
+      uncopiedFileInDB == copiedFile,
+      "\(uncopiedFileInDB.diff(copiedFile).prettyDescription)"
+    )
+  }
+
   @Test("Upsert Asset File - New")
   func upsertAssetFileNew() throws {
-    let asset = try dataGen.createExportedAsset()
-    let file = dataGen.createExportedFile(asset: asset)
+    let asset = dataGen.createExportedAsset()
+    let file = try dataGen.createExportedFile(asset: asset)
     _ = try exporterDB.upsertAsset(asset: asset)
     _ = try exporterDB.upsertFile(file: file)
 
@@ -487,8 +594,8 @@ final class ExporterDBTests {
 
   @Test("Upsert Asset File - Updated")
   func upsertAssetFileUpdated() throws {
-    let asset = try dataGen.createExportedAsset()
-    let file = dataGen.createExportedFile(asset: asset)
+    let asset = dataGen.createExportedAsset()
+    let file = try dataGen.createExportedFile(asset: asset)
     _ = try exporterDB.upsertAsset(asset: asset)
     _ = try exporterDB.upsertFile(file: file)
 

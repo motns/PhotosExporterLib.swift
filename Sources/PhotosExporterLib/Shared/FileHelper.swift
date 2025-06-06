@@ -18,15 +18,15 @@ import Foundation
 
 struct FileHelper {
   public static func pathForDateAndLocation(
-    dateOpt: Date?,
-    countryOpt: String? = nil,
-    cityOpt: String? = nil
+    date: Date?,
+    country: String? = nil,
+    city: String? = nil
   ) -> String {
     let calendar = Calendar.current
     let year: String
     let month: String
 
-    if let date = dateOpt {
+    if let date = date {
       year = String(calendar.component(.year, from: date))
       month = String(format: "%02d", calendar.component(.month, from: date))
     } else {
@@ -34,35 +34,17 @@ struct FileHelper {
       month = "00"
     }
 
-    let countryComponent = switch countryOpt {
+    let countryComponent = switch country {
     case .some(let country) where country != "": "-\(normaliseForPath(country))"
     default: ""
     }
 
-    let cityComponent = switch cityOpt {
+    let cityComponent = switch city {
     case .some(let city) where city != "": "-\(normaliseForPath(city))"
     default: ""
     }
 
     return "\(year)/\(year)-\(month)\(countryComponent)\(cityComponent)"
-  }
-
-  public static func filenameWithDateAndEdited(originalFileName: String, dateOpt: Date?, isEdited: Bool) -> String {
-      let prefix: String
-      if let date = dateOpt {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMddHHmmss"
-        prefix = formatter.string(from: date)
-      } else {
-        prefix = "00000000000000"
-      }
-
-      let fileURL = URL(filePath: originalFileName)
-      let name = normaliseForPath(fileURL.deletingPathExtension().lastPathComponent)
-      let ext = fileURL.pathExtension
-      let suffix = isEdited ? "_edited" : ""
-
-      return "\(prefix)-\(name)\(suffix).\(ext)"
   }
 
   public static func normaliseForPath(_ str: String) -> String {

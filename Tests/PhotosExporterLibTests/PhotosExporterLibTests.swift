@@ -124,17 +124,17 @@ final class PhotosExporterLibTests {
     // - MARK: Create expected models
     let exportedAsset1 = ExportedAsset.fromPhotokitAsset(
       asset: asset1,
-      cityId: try cityLookup.getIdByName(name: "London"),
-      countryId: try countryLookup.getIdByName(name: "United Kingdom"),
       aestheticScore: 902561736,
       now: startTime,
     )!
     let exportedFile1 = ExportedFile.fromPhotokitAssetResource(
       asset: asset1,
       resource: asset1.resources[0],
-      countryOpt: "United Kingdom",
-      cityOpt: "London",
       now: startTime,
+      countryId: try countryLookup.getIdByName(name: "United Kingdom"),
+      cityId: try cityLookup.getIdByName(name: "London"),
+      country: "United Kingdom",
+      city: "London",
     )!.copy(wasCopied: true)
     let assetFile1 = ExportedAssetFile(
       assetId: exportedAsset1.id,
@@ -145,17 +145,17 @@ final class PhotosExporterLibTests {
 
     let exportedAsset2 = ExportedAsset.fromPhotokitAsset(
       asset: asset2,
-      cityId: try cityLookup.getIdByName(name: "Madrid"),
-      countryId: try countryLookup.getIdByName(name: "Spain"),
       aestheticScore: 0,
       now: startTime,
     )!
     let exportedFile2 = ExportedFile.fromPhotokitAssetResource(
       asset: asset2,
       resource: asset2.resources[0],
-      countryOpt: "Spain",
-      cityOpt: "Madrid",
       now: startTime,
+      countryId: try countryLookup.getIdByName(name: "Spain"),
+      cityId: try cityLookup.getIdByName(name: "Madrid"),
+      country: "Spain",
+      city: "Madrid",
     )!.copy(wasCopied: true)
     let assetFile2 = ExportedAssetFile(
       assetId: exportedAsset2.id,
@@ -166,17 +166,17 @@ final class PhotosExporterLibTests {
 
     let exportedAsset3 = ExportedAsset.fromPhotokitAsset(
       asset: asset3,
-      cityId: nil,
-      countryId: nil,
       aestheticScore: 0,
       now: startTime,
     )!
     let exportedFile3 = ExportedFile.fromPhotokitAssetResource(
       asset: asset3,
       resource: asset3.resources[0],
-      countryOpt: nil,
-      cityOpt: nil,
       now: startTime,
+      countryId: nil,
+      cityId: nil,
+      country: nil,
+      city: nil,
     )!.copy(wasCopied: true)
     let assetFile3 = ExportedAssetFile(
       assetId: exportedAsset3.id,
@@ -279,7 +279,7 @@ final class PhotosExporterLibTests {
         destination:
           fileDirURL
             .appending(path: exportedFile1.importedFileDir)
-            .appending(path: exportedFile1.importedFileName),
+            .appending(path: exportedFile1.id),
       ),
       CopyResourceCall(
         assetId: asset2.id,
@@ -288,7 +288,7 @@ final class PhotosExporterLibTests {
         destination:
           fileDirURL
             .appending(path: exportedFile2.importedFileDir)
-            .appending(path: exportedFile2.importedFileName),
+            .appending(path: exportedFile2.id),
       ),
       CopyResourceCall(
         assetId: asset3.id,
@@ -297,7 +297,7 @@ final class PhotosExporterLibTests {
         destination:
           fileDirURL
             .appending(path: exportedFile3.importedFileDir)
-            .appending(path: exportedFile3.importedFileName),
+            .appending(path: exportedFile3.id),
       ),
     ].sorted(by: { $0.assetId < $1.assetId })
     let sortedMockCopyCalls = self.photokitMock.copyResourceCalls
@@ -315,61 +315,61 @@ final class PhotosExporterLibTests {
       CreateSymlinkCall(
         src: fileDirURL
           .appending(path: exportedFile1.importedFileDir)
-          .appending(path: exportedFile1.importedFileName),
+          .appending(path: exportedFile1.id),
         dest: albumDirURL
           .appending(path: FileHelper.normaliseForPath(exportedAlbum1.name))
-          .appending(path: exportedFile1.importedFileName),
+          .appending(path: exportedFile1.id),
       ),
       CreateSymlinkCall(
         src: fileDirURL
           .appending(path: exportedFile2.importedFileDir)
-          .appending(path: exportedFile2.importedFileName),
+          .appending(path: exportedFile2.id),
         dest: albumDirURL
           .appending(path: FileHelper.normaliseForPath(exportedFolder1.name))
           .appending(path: FileHelper.normaliseForPath(exportedAlbum2.name))
-          .appending(path: exportedFile2.importedFileName),
+          .appending(path: exportedFile2.id),
       ),
       CreateSymlinkCall(
         src: fileDirURL
           .appending(path: exportedFile3.importedFileDir)
-          .appending(path: exportedFile3.importedFileName),
+          .appending(path: exportedFile3.id),
         dest: albumDirURL
           .appending(path: FileHelper.normaliseForPath(exportedFolder1.name))
           .appending(path: FileHelper.normaliseForPath(exportedFolder2.name))
           .appending(path: FileHelper.normaliseForPath(exportedAlbum3.name))
-          .appending(path: exportedFile3.importedFileName),
+          .appending(path: exportedFile3.id),
       ),
       // Location symlinks
       CreateSymlinkCall(
         src: fileDirURL
           .appending(path: exportedFile1.importedFileDir)
-          .appending(path: exportedFile1.importedFileName),
+          .appending(path: exportedFile1.id),
         dest: locationDirURL
           .appending(path: FileHelper.normaliseForPath("United Kingdom"))
           .appending(path: FileHelper.normaliseForPath("London"))
           .appending(path: DateHelper.getYearStr(exportedAsset1.createdAt))
           .appending(path: DateHelper.getYearMonthStr(exportedAsset1.createdAt))
-          .appending(path: exportedFile1.importedFileName),
+          .appending(path: exportedFile1.id),
       ),
       CreateSymlinkCall(
         src: fileDirURL
           .appending(path: exportedFile2.importedFileDir)
-          .appending(path: exportedFile2.importedFileName),
+          .appending(path: exportedFile2.id),
         dest: locationDirURL
           .appending(path: FileHelper.normaliseForPath("Spain"))
           .appending(path: FileHelper.normaliseForPath("Madrid"))
           .appending(path: DateHelper.getYearStr(exportedAsset2.createdAt))
           .appending(path: DateHelper.getYearMonthStr(exportedAsset2.createdAt))
-          .appending(path: exportedFile2.importedFileName),
+          .appending(path: exportedFile2.id),
       ),
       // Top shots symlinks
       CreateSymlinkCall(
         src: fileDirURL
           .appending(path: exportedFile1.importedFileDir)
-          .appending(path: exportedFile1.importedFileName),
+          .appending(path: exportedFile1.id),
         dest: topshotsDirURL
           .appending(
-            path: "\(exportedAsset1.aestheticScore)-\(exportedFile1.importedFileName)"
+            path: "\(exportedAsset1.aestheticScore)-\(exportedFile1.id)"
           ),
       ),
     ].sorted(by: { $0.dest.absoluteString < $1.dest.absoluteString })
@@ -420,6 +420,7 @@ final class PhotosExporterLibTests {
       albumCount: 3,
       folderCount: 3,
       fileSizeTotal: exportedFiles.reduce(0) { sum, curr in sum + curr.fileSize },
+      runTime: historyEntryInDBInitial!.runTime,
     )
 
     #expect(
@@ -489,25 +490,23 @@ final class PhotosExporterLibTests {
 
     let updatedExportedAsset1 = ExportedAsset.fromPhotokitAsset(
       asset: updatedAsset1,
-      cityId: try cityLookup.getIdByName(name: "London"),
-      countryId: try countryLookup.getIdByName(name: "United Kingdom"),
       aestheticScore: 808547258,
       now: startTime,
     )!
 
     let updatedExportedAsset2 = ExportedAsset.fromPhotokitAsset(
       asset: asset2,
-      cityId: try cityLookup.getIdByName(name: "Budapest"),
-      countryId: try countryLookup.getIdByName(name: "Hungary"),
       aestheticScore: 0,
       now: startTime,
     )!
     let updatedExportedFile2 = ExportedFile.fromPhotokitAssetResource(
       asset: asset2,
       resource: asset2.resources[0],
-      countryOpt: "Hungary",
-      cityOpt: "Budapest",
       now: startTime,
+      countryId: try countryLookup.getIdByName(name: "Hungary"),
+      cityId: try cityLookup.getIdByName(name: "Budapest"),
+      country: "Hungary",
+      city: "Budapest",
     )!.copy(wasCopied: true)
 
     let updatedExportedAlbum1 = try ExportedAlbum.fromPhotokitAlbum(
@@ -534,8 +533,8 @@ final class PhotosExporterLibTests {
     let expectedUpdateRes = ExportResult(
       assetExport: AssetExportResult(
         assetInserted: 0,
-        assetUpdated: 2,
-        assetUnchanged: 1,
+        assetUpdated: 1,
+        assetUnchanged: 2,
         assetSkipped: 0,
         assetMarkedForDeletion: 0,
         assetDeleted: 0,
@@ -629,17 +628,15 @@ final class PhotosExporterLibTests {
 
     let exportedAsset1 = try dataGen.createAndSaveExportedAsset(
       photokitAsset: asset1,
-      cityId: nil,
-      countryId: nil,
       aestheticScore: 0,
       now: now,
     )
     let exportedFile1 = try dataGen.createAndSaveExportedFile(
       photokitAsset: asset1,
       photokitResource: asset1.resources[0],
-      countryOpt: nil,
-      cityOpt: nil,
       now: now,
+      country: nil,
+      city: nil,
       wasCopied: true,
     )
     let assetFile1 = try dataGen.createAndSaveAssetFile(
@@ -649,17 +646,15 @@ final class PhotosExporterLibTests {
 
     let exportedAsset2 = try dataGen.createAndSaveExportedAsset(
       photokitAsset: asset2,
-      cityId: nil,
-      countryId: nil,
       aestheticScore: 0,
       now: now,
     )
     let exportedFile2 = try dataGen.createAndSaveExportedFile(
       photokitAsset: asset2,
       photokitResource: asset2.resources[0],
-      countryOpt: nil,
-      cityOpt: nil,
       now: now,
+      country: nil,
+      city: nil,
       wasCopied: true,
     )
     let assetFile2 = try dataGen.createAndSaveAssetFile(
@@ -669,17 +664,15 @@ final class PhotosExporterLibTests {
 
     let exportedAssetToDeleteLater = try dataGen.createAndSaveExportedAsset(
       photokitAsset: assetToDeleteLater,
-      cityId: nil,
-      countryId: nil,
       aestheticScore: 0,
       now: now,
     )
     let exportedFileToDeleteLaterAsset = try dataGen.createAndSaveExportedFile(
       photokitAsset: assetToDeleteLater,
       photokitResource: assetToDeleteLater.resources[0],
-      countryOpt: nil,
-      cityOpt: nil,
       now: now,
+      country: nil,
+      city: nil,
       wasCopied: true,
     )
     let assetFileToDeleteLaterAsset = try dataGen.createAndSaveAssetFile(
@@ -689,25 +682,23 @@ final class PhotosExporterLibTests {
 
     let exportedAsset3 = try dataGen.createAndSaveExportedAsset(
       photokitAsset: asset3,
-      cityId: nil,
-      countryId: nil,
       aestheticScore: 0,
       now: now,
     )
     let exportedFile3 = try dataGen.createAndSaveExportedFile(
       photokitAsset: asset3,
       photokitResource: asset3.resources[0],
-      countryOpt: nil,
-      cityOpt: nil,
       now: now,
+      country: nil,
+      city: nil,
       wasCopied: true,
     )
     let exportedFileToDeleteLater = try dataGen.createAndSaveExportedFile(
       photokitAsset: asset3,
       photokitResource: asset3.resources[1],
-      countryOpt: nil,
-      cityOpt: nil,
       now: now,
+      country: nil,
+      city: nil,
       wasCopied: true,
     )
     let exportedFileDeleted = try dataGen.createAndSaveExportedFile(
@@ -806,7 +797,6 @@ final class PhotosExporterLibTests {
     )
 
     let assetsInDB = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
-    // Avoid using Sets, because they use Hashable instead of Comparable
     #expect(
       assetsInDB == exportedAssets,
       "\(Diff.getDiff(assetsInDB, exportedAssets).prettyDescription)"
@@ -990,12 +980,12 @@ final class PhotosExporterLibTests {
       RemoveCall(
         url: fileDirURL
           .appending(path: exportedFileDeleted.importedFileDir)
-          .appending(path: exportedFileDeleted.importedFileName),
+          .appending(path: exportedFileDeleted.id),
       ),
       RemoveCall(
         url: fileDirURL
           .appending(path: exportedFileForDeletedAsset.importedFileDir)
-          .appending(path: exportedFileForDeletedAsset.importedFileName),
+          .appending(path: exportedFileForDeletedAsset.id),
       ),
     ].sorted { $0.url.absoluteString < $1.url.absoluteString }
 
@@ -1163,12 +1153,12 @@ final class PhotosExporterLibTests {
       RemoveCall(
         url: fileDirURL
           .appending(path: exportedFileToDeleteLaterAsset.importedFileDir)
-          .appending(path: exportedFileToDeleteLaterAsset.importedFileName),
+          .appending(path: exportedFileToDeleteLaterAsset.id),
       ),
       RemoveCall(
         url: fileDirURL
           .appending(path: exportedFileToDeleteLater.importedFileDir)
-          .appending(path: exportedFileToDeleteLater.importedFileName),
+          .appending(path: exportedFileToDeleteLater.id),
       ),
     ].sorted { $0.url.absoluteString < $1.url.absoluteString }
 

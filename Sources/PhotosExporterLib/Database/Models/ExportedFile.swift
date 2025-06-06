@@ -53,82 +53,70 @@ struct ExportedFile: Codable {
   let id: String
   let fileType: FileType
   let originalFileName: String
+  let geoLat: Decimal?
+  let geoLong: Decimal?
+  let countryId: Int64?
+  let cityId: Int64?
   let fileSize: Int64
   let pixelHeight: Int64
   let pixelWidth: Int64
   let importedAt: Date
   let importedFileDir: String
-  let importedFileName: String
   let wasCopied: Bool
 
   enum CodingKeys: String, CodingKey {
     case id = "id"
     case fileType = "file_type_id"
     case originalFileName = "original_file_name"
+    case geoLat = "geo_lat"
+    case geoLong = "geo_long"
+    case countryId = "country_id"
+    case cityId = "city_id"
     case fileSize = "file_size"
     case pixelHeight = "pixel_height"
     case pixelWidth = "pixel_width"
     case importedAt = "imported_at"
     case importedFileDir = "imported_file_dir"
-    case importedFileName = "imported_file_name"
     case wasCopied = "was_copied"
   }
 
   func needsUpdate(_ other: ExportedFile) -> Bool {
-    let newWasCopied: Bool
-    if self.importedFileDir != other.importedFileDir
-    || self.importedFileName != other.importedFileName {
-      // The output location changed, so the file needs to
-      // be copied again
-      newWasCopied = false
-    } else {
-      // Otherwise it shouldn't normally be possible to
-      // unset the "copied" flag
-      newWasCopied = self.wasCopied || other.wasCopied
-    }
+    let newGeoLat = other.geoLat ?? self.geoLat
+    let newGeoLong = other.geoLong ?? self.geoLong
+    let newCountryId = other.countryId ?? self.countryId
+    let newCityId = other.cityId ?? self.cityId
 
-    return self.importedFileDir != other.importedFileDir
-      || self.importedFileName != other.importedFileName
-      || self.fileSize != other.fileSize
-      || self.pixelHeight != other.pixelHeight
-      || self.pixelWidth != other.pixelWidth
+    let locationChanged = self.countryId != newCountryId
+      || self.cityId != newCityId
+    let newImportedFileDir = locationChanged ? other.importedFileDir : self.importedFileDir
+    let newWasCopied = locationChanged ? false : (self.wasCopied || other.wasCopied)
+
+    return self.importedFileDir != newImportedFileDir
       // It shouldn't be possible to unset the "copied" flag
       || self.wasCopied != newWasCopied
-  }
-
-  static func == (lhs: Self, rhs: Self) -> Bool {
-    return lhs.id == rhs.id
-      && lhs.fileType == rhs.fileType
-      && lhs.originalFileName == rhs.originalFileName
-      && lhs.fileSize == rhs.fileSize
-      && lhs.pixelHeight == rhs.pixelHeight
-      && lhs.pixelWidth == rhs.pixelWidth
-      && DateHelper.secondsEquals(lhs.importedAt, rhs.importedAt)
-      && lhs.importedFileDir == rhs.importedFileDir
-      && lhs.importedFileName == rhs.importedFileName
-      && lhs.wasCopied == rhs.wasCopied
+      || self.geoLat != newGeoLat
+      || self.geoLong != newGeoLong
+      || self.countryId != newCountryId
+      || self.cityId != newCityId
   }
 
   func updated(_ from: ExportedFile) -> ExportedFile {
-    let newWasCopied: Bool
-    if self.importedFileDir != from.importedFileDir
-    || self.importedFileName != from.importedFileName {
-      // The output location changed, so the file needs to
-      // be copied again
-      newWasCopied = false
-    } else {
-      // Otherwise it shouldn't normally be possible to
-      // unset the "copied" flag
-      newWasCopied = self.wasCopied || from.wasCopied
-    }
+    let newGeoLat = from.geoLat ?? self.geoLat
+    let newGeoLong = from.geoLong ?? self.geoLong
+    let newCountryId = from.countryId ?? self.countryId
+    let newCityId = from.cityId ?? self.cityId
+
+    let locationChanged = self.countryId != newCountryId
+      || self.cityId != newCityId
+    let newImportedFileDir = locationChanged ? from.importedFileDir : self.importedFileDir
+    let newWasCopied = locationChanged ? false : (self.wasCopied || from.wasCopied)
 
     return self.copy(
-      fileSize: from.fileSize,
-      pixelHeight: from.pixelHeight,
-      pixelWidth: from.pixelWidth,
-      importedFileDir: from.importedFileDir,
-      importedFileName: from.importedFileName,
-      // It shouldn't normally be possible to unset the "copied" flag
+      geoLat: newGeoLat,
+      geoLong: newGeoLong,
+      countryId: newCountryId,
+      cityId: newCityId,
+      importedFileDir: newImportedFileDir,
       wasCopied: newWasCopied,
     )
   }
@@ -137,47 +125,80 @@ struct ExportedFile: Codable {
     id: String? = nil,
     fileType: FileType? = nil,
     originalFileName: String? = nil,
+    geoLat: Decimal?? = nil,
+    geoLong: Decimal?? = nil,
+    countryId: Int64?? = nil,
+    cityId: Int64?? = nil,
     fileSize: Int64? = nil,
     pixelHeight: Int64? = nil,
     pixelWidth: Int64? = nil,
     importedAt: Date? = nil,
     importedFileDir: String? = nil,
-    importedFileName: String? = nil,
     wasCopied: Bool? = nil,
   ) -> ExportedFile {
     return ExportedFile(
       id: id ?? self.id,
       fileType: fileType ?? self.fileType,
       originalFileName: originalFileName ?? self.originalFileName,
+      geoLat: geoLat ?? self.geoLat,
+      geoLong: geoLong ?? self.geoLong,
+      countryId: countryId ?? self.countryId,
+      cityId: cityId ?? self.cityId,
       fileSize: fileSize ?? self.fileSize,
       pixelHeight: pixelHeight ?? self.pixelHeight,
       pixelWidth: pixelWidth ?? self.pixelWidth,
       importedAt: importedAt ?? self.importedAt,
       importedFileDir: importedFileDir ?? self.importedFileDir,
-      importedFileName: importedFileName ?? self.importedFileName,
       wasCopied: wasCopied ?? self.wasCopied,
     )
   }
 
-  static func generateId(asset: PhotokitAsset, resource: PhotokitAssetResource) -> String {
-    let datePrefix: String
-    if let date = asset.createdAt {
+  static func generateId(
+    assetCreatedAt: Date?,
+    fileSize: Int64,
+    fileType: FileType?,
+    originalFileName: String,
+  ) -> String {
+    let prefix: String
+    if let date = assetCreatedAt {
       let formatter = DateFormatter()
       formatter.dateFormat = "yyyyMMddHHmmss"
-      datePrefix = formatter.string(from: date)
+      prefix = formatter.string(from: date)
     } else {
-      datePrefix = "00000000000000"
+      prefix = "00000000000000"
     }
 
-    return "\(datePrefix)-\(resource.fileSize)-\(resource.originalFileName)"
+    let fileURL = URL(filePath: originalFileName)
+    let name = FileHelper.normaliseForPath(fileURL.deletingPathExtension().lastPathComponent)
+    let ext = fileURL.pathExtension.lowercased()
+    let suffix = (fileType?.isEdited() ?? false) ? "_edited" : ""
+
+    return "\(prefix)-\(fileSize)-\(name)\(suffix).\(ext)"
   }
 
+  static func generateId(
+    asset: PhotokitAsset,
+    resource: PhotokitAssetResource,
+  ) -> String {
+    return generateId(
+      assetCreatedAt: asset.createdAt,
+      fileSize: resource.fileSize,
+      fileType: FileType.fromPhotokitAssetResourceType(
+        resource.assetResourceType
+      ),
+      originalFileName: resource.originalFileName,
+    )
+  }
+
+  // swiftlint:disable:next function_parameter_count
   static func fromPhotokitAssetResource(
     asset: PhotokitAsset,
     resource: PhotokitAssetResource,
-    countryOpt: String?,
-    cityOpt: String?,
-    now: Date?,
+    now: Date,
+    countryId: Int64?,
+    cityId: Int64?,
+    country: String?,
+    city: String?,
   ) -> ExportedFile? {
     let fileTypeOpt = FileType.fromPhotokitAssetResourceType(resource.assetResourceType)
     guard let fileType = fileTypeOpt else {
@@ -186,28 +207,22 @@ struct ExportedFile: Codable {
       return nil
     }
 
-    let isEdited = switch fileType {
-    case .editedImage, .editedVideo, .editedLiveVideo: true
-    default: false
-    }
-
     return ExportedFile(
       id: generateId(asset: asset, resource: resource),
       fileType: fileType,
       originalFileName: resource.originalFileName,
+      geoLat: asset.geoLat,
+      geoLong: asset.geoLong,
+      countryId: countryId,
+      cityId: cityId,
       fileSize: resource.fileSize,
       pixelHeight: resource.pixelHeight,
       pixelWidth: resource.pixelWidth,
-      importedAt: now ?? Date(),
+      importedAt: now,
       importedFileDir: FileHelper.pathForDateAndLocation(
-        dateOpt: asset.createdAt,
-        countryOpt: countryOpt,
-        cityOpt: cityOpt
-      ),
-      importedFileName: FileHelper.filenameWithDateAndEdited(
-        originalFileName: resource.originalFileName,
-        dateOpt: asset.createdAt,
-        isEdited: isEdited
+        date: asset.createdAt,
+        country: country,
+        city: city,
       ),
       wasCopied: false,
     )
@@ -240,12 +255,15 @@ extension ExportedFile: Identifiable, TableRecord, PersistableRecord, FetchableR
     static let id = Column(CodingKeys.id)
     static let fileType = Column(CodingKeys.fileType)
     static let originalFileName = Column(CodingKeys.originalFileName)
+    static let geoLat = Column(CodingKeys.geoLat)
+    static let geoLong = Column(CodingKeys.geoLong)
+    static let countryId = Column(CodingKeys.countryId)
+    static let cityId = Column(CodingKeys.cityId)
     static let fileSize = Column(CodingKeys.fileSize)
     static let pixelHeight = Column(CodingKeys.pixelHeight)
     static let pixelWidth = Column(CodingKeys.pixelWidth)
     static let importedAt = Column(CodingKeys.importedAt)
     static let importedFileDir = Column(CodingKeys.importedFileDir)
-    static let importedFileName = Column(CodingKeys.importedFileName)
     static let wasCopied = Column(CodingKeys.wasCopied)
   }
 
@@ -254,12 +272,15 @@ extension ExportedFile: Identifiable, TableRecord, PersistableRecord, FetchableR
       table.primaryKey("id", .text).notNull()
       table.column("file_type_id", .integer).notNull().references("file_type")
       table.column("original_file_name", .text).notNull()
+      table.column("geo_lat", .text)
+      table.column("geo_long", .text)
+      table.column("country_id", .integer).references("country")
+      table.column("city_id", .integer).references("city")
       table.column("file_size", .integer).notNull()
       table.column("pixel_height", .integer).notNull()
       table.column("pixel_width", .integer).notNull()
       table.column("imported_at", .datetime).notNull()
       table.column("imported_file_dir", .text).notNull()
-      table.column("imported_file_name", .text).notNull()
       table.column("was_copied", .boolean).notNull()
     }
   }

@@ -79,7 +79,7 @@ struct FileExporter {
       if try fileManager.createDirectory(path: destinationDirURL.path(percentEncoded: false)) == .success {
         logger.trace("Created destination directory: \(destinationDirURL.path(percentEncoded: false))")
       }
-      let destinationFileURL = destinationDirURL.appending(path: toCopy.exportedFile.importedFileName)
+      let destinationFileURL = destinationDirURL.appending(path: toCopy.exportedFile.id)
 
       let copyResult = try await photokit.copyResource(
         assetId: toCopy.assetIds.first!,
@@ -126,7 +126,7 @@ struct FileExporter {
     for file in orphanedFiles {
       let fileUrl = filesDirURL
         .appending(path: file.importedFileDir)
-        .appending(path: file.importedFileName)
+        .appending(path: file.id)
 
       let logMetadata: Logger.Metadata = [
         "id": "\(file.id)",
