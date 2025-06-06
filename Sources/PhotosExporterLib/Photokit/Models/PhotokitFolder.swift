@@ -36,3 +36,13 @@ struct PhotokitFolder: Sendable {
     )
   }
 }
+
+extension PhotokitFolder: DiffableStruct {
+  func getStructDiff(_ other: PhotokitFolder) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.id))
+      .add(diffProperty(other, \.title))
+      .add(diffProperty(other, \.subfolders))
+      .add(diffProperty(other, \.albums))
+  }
+}

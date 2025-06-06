@@ -93,3 +93,18 @@ struct PhotokitAsset: Sendable {
     )
   }
 }
+
+extension PhotokitAsset: DiffableStruct {
+  func getStructDiff(_ other: PhotokitAsset) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.id))
+      .add(diffProperty(other, \.assetMediaType))
+      .add(diffProperty(other, \.assetLibrary))
+      .add(diffProperty(other, \.createdAt))
+      .add(diffProperty(other, \.updatedAt))
+      .add(diffProperty(other, \.isFavourite))
+      .add(diffProperty(other, \.geoLat))
+      .add(diffProperty(other, \.geoLong))
+      .add(diffProperty(other, \.resources))
+  }
+}

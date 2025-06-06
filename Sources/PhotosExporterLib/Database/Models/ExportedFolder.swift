@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import GRDB
 
-struct ExportedFolder: Codable, Equatable, Hashable {
+struct ExportedFolder: Codable {
   let id: String
   let name: String
   let parentId: String?
@@ -59,6 +59,15 @@ struct ExportedFolder: Codable, Equatable, Hashable {
       name: folder.title,
       parentId: parentId
     )
+  }
+}
+
+extension ExportedFolder: DiffableStruct {
+  func getStructDiff(_ other: ExportedFolder) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.id))
+      .add(diffProperty(other, \.name))
+      .add(diffProperty(other, \.parentId))
   }
 }
 

@@ -14,23 +14,29 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import GRDB
+import Testing
+@testable import PhotosExporterLib
 
-// Used for querying only - doesn't map to a database table
-struct ExportedFileWithAssetIds: Decodable, FetchableRecord {
-  let exportedFile: ExportedFile
-  let assetIds: [String]
-
-  enum CodingKeys: String, CodingKey {
-    case exportedFile
-    case assetIds = "asset_ids"
+@Suite("Set Diff Test")
+struct SetDiffTest {
+  @Test("String Conversion")
+  func stringConversion() {
+    let diffStr = "\(Diff.getDiff(Set([1, 2, 3]), Set([1, 2, 4])))"
+    let expected =
+    "different(SetDiff(onlyInLeft: [3], onlyInRight: [4]))"
+    #expect(diffStr == expected)
   }
-}
 
-extension ExportedFileWithAssetIds: DiffableStruct {
-  func getStructDiff(_ other: ExportedFileWithAssetIds) -> StructDiff {
-    return StructDiff()
-      .add(diffProperty(other, \.exportedFile))
-      .add(diffProperty(other, \.assetIds))
+  @Test("Pretty String Conversion")
+  func prettyStringConversion() {
+    let diffStr = Diff.getDiff(Set([1, 2, 3]), Set([1, 2, 4])).prettyDescription
+    let expected = """
+    SetDiff:
+      Only in Left:
+        3
+      Only in Right:
+        4
+    """
+    #expect(diffStr == expected)
   }
 }

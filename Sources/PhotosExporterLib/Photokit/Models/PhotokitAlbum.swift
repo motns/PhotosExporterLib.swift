@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 import Foundation
 
-enum PhotokitAssetCollectionSubType: Int, Sendable {
+enum PhotokitAssetCollectionSubType: Int, Sendable, SingleValueDiffable {
   case albumRegular = 2
   case albumSyncedEvent = 3
   case albumSyncedFaces = 4
@@ -65,5 +65,15 @@ struct PhotokitAlbum: Sendable {
       collectionSubtype: collectionSubtype ?? self.collectionSubtype,
       assetIds: assetIds ?? self.assetIds,
     )
+  }
+}
+
+extension PhotokitAlbum: DiffableStruct {
+  func getStructDiff(_ other: PhotokitAlbum) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.id))
+      .add(diffProperty(other, \.title))
+      .add(diffProperty(other, \.collectionSubtype))
+      .add(diffProperty(other, \.assetIds))
   }
 }

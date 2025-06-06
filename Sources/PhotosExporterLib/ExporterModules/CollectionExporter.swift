@@ -173,3 +173,15 @@ public struct CollectionExportResult: Codable, Sendable, Equatable {
     )
   }
 }
+
+extension CollectionExportResult: DiffableStruct {
+  func getStructDiff(_ other: CollectionExportResult) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.folderInserted))
+      .add(diffProperty(other, \.folderUpdated))
+      .add(diffProperty(other, \.folderUnchanged))
+      .add(diffProperty(other, \.albumInserted))
+      .add(diffProperty(other, \.albumUpdated))
+      .add(diffProperty(other, \.albumUnchanged))
+  }
+}

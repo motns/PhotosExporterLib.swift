@@ -156,8 +156,11 @@ final class ExporterDBTests {
     _ = try exporterDB.upsertAlbum(album: album1)
     _ = try exporterDB.upsertAlbum(album: album2)
 
-    let res = try exporterDB.getAlbumsInFolder(folderId: parentFolder.id)
-    #expect(Set(res) == Set([album1, album2]))
+    let res = try exporterDB
+      .getAlbumsInFolder(folderId: parentFolder.id)
+      .sorted { $0.id < $1.id }
+    let expected = [album1, album2].sorted { $0.id < $1.id }
+    #expect(res == expected)
   }
 
   @Test("Get orphaned Files")
@@ -174,7 +177,7 @@ final class ExporterDBTests {
     let expected = [file3, file4].sorted(by: { $0.id < $1.id })
     #expect(
       res == expected,
-      "\(Diff.getDiffAsString(res, expected) ?? "")"
+      "\(Diff.getDiff(res, expected).prettyDescription)"
     )
   }
 
@@ -228,7 +231,7 @@ final class ExporterDBTests {
 
     #expect(
       filesWithLocation == expected,
-      "\(Diff.getDiffAsString(filesWithLocation, expected) ?? "")",
+      "\(Diff.getDiff(filesWithLocation, expected).prettyDescription)",
     )
   }
 
@@ -271,7 +274,7 @@ final class ExporterDBTests {
 
     #expect(
       filesWithScore == expected,
-      "\(Diff.getDiffAsString(filesWithScore, expected) ?? "")",
+      "\(Diff.getDiff(filesWithScore, expected).prettyDescription)",
     )
   }
 
@@ -295,11 +298,16 @@ final class ExporterDBTests {
       assetIds: [asset2.id]
     )
 
-    let toCopy = try exporterDB.getFilesWithAssetIdsToCopy()
-    #expect(Set(toCopy) == Set([fileWithAssetIds1, fileWithAssetIds2]))
+    let toCopy = try exporterDB
+      .getFilesWithAssetIdsToCopy()
+      .sorted { $0.exportedFile.id < $1.exportedFile.id }
+    let expected = [fileWithAssetIds1, fileWithAssetIds2]
+      .sorted { $0.exportedFile.id < $1.exportedFile.id }
+    #expect(toCopy == expected)
   }
 
   @Test("Get Files for Album")
+  // swiftlint:disable:next function_body_length
   func getFilesForAlbum() throws {
     let asset1 = try dataGen.createExportedAsset()
     _ = try self.exporterDB.upsertAsset(asset: asset1)
@@ -354,8 +362,11 @@ final class ExporterDBTests {
     )
     _ = try self.exporterDB.upsertAlbum(album: newAlbum)
 
-    let filesForAlbum = try self.exporterDB.getFilesForAlbum(albumId: newAlbum.id)
-    #expect(Set(filesForAlbum) == Set([file1, file2, file3]))
+    let filesForAlbum = try self.exporterDB
+      .getFilesForAlbum(albumId: newAlbum.id)
+      .sorted { $0.id < $1.id }
+    let expected = [file1, file2, file3].sorted { $0.id < $1.id }
+    #expect(filesForAlbum == expected)
   }
 
   @Test("Get Folders with Parent")
@@ -380,8 +391,11 @@ final class ExporterDBTests {
     _ = try exporterDB.upsertFolder(folder: childFolder1)
     _ = try exporterDB.upsertFolder(folder: childFolder2)
 
-    let res = try exporterDB.getFoldersWithParent(parentId: parentFolder.id)
-    #expect(Set(res) == Set([childFolder1, childFolder2]))
+    let res = try exporterDB
+      .getFoldersWithParent(parentId: parentFolder.id)
+      .sorted { $0.id < $1.id }
+    let expected = [childFolder1, childFolder2].sorted { $0.id < $1.id }
+    #expect(res == expected)
   }
 
   @Test("Upsert Asset - New")
@@ -625,7 +639,7 @@ final class ExporterDBTests {
     let expected = [asset1, asset3].sorted(by: { $0.id < $1.id })
     #expect(
       assets == expected,
-      "\(Diff.getDiffAsString(assets, expected) ?? "")",
+      "\(Diff.getDiff(assets, expected).prettyDescription)",
     )
   }
 
@@ -694,7 +708,7 @@ final class ExporterDBTests {
     let expected = [assetFile1, assetFile3].sorted(by: { $0.assetId < $1.assetId })
     #expect(
       assetFiles == expected,
-      "\(Diff.getDiffAsString(assetFiles, expected) ?? "")",
+      "\(Diff.getDiff(assetFiles, expected).prettyDescription)",
     )
   }
 
@@ -716,7 +730,7 @@ final class ExporterDBTests {
     let entryInDB = try exporterDB.getExportResultHistoryEntry(id: entry.id)
     #expect(
       entryInDB == entry,
-      "\(entryInDB?.getDiffAsString(entry) ?? "")"
+      "\(entryInDB?.diff(entry).prettyDescription ?? "empty")"
     )
   }
 
@@ -730,7 +744,7 @@ final class ExporterDBTests {
     let latestEntryInDB = try exporterDB.getLatestExportResultHistoryEntry()
     #expect(
       latestEntryInDB == latestEntry,
-      "\(latestEntryInDB?.getDiffAsString(latestEntry) ?? "")"
+      "\(latestEntryInDB?.diff(latestEntry).prettyDescription ?? "empty")"
     )
   }
 
@@ -744,14 +758,14 @@ final class ExporterDBTests {
     let first10Res = try exporterDB.getExportResultHistoryEntries(limit: 10)
     #expect(
       first10Res == first10Expected,
-      "\(Diff.getDiffAsString(first10Res, first10Expected) ?? "")",
+      "\(Diff.getDiff(first10Res, first10Expected).prettyDescription)",
     )
 
     let next10Expected = Array(entries[10..<20])
     let next10Res = try exporterDB.getExportResultHistoryEntries(limit: 10, offset: 10)
     #expect(
       next10Res == next10Expected,
-      "\(Diff.getDiffAsString(next10Res, next10Expected) ?? "")",
+      "\(Diff.getDiff(next10Res, next10Expected).prettyDescription)",
     )
   }
 }

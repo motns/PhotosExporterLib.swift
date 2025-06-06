@@ -86,23 +86,19 @@ struct TestDataGenerator {
       createdAt: actualCreatedAt,
       updatedAt: updatedAt ?? randomUpdatedAt,
       isFavourite: isFavourite ?? Bool.random(),
-      geoLat: Double.random(in: -90...90),
-      geoLong: Double.random(in: -180...180),
+      geoLat: Decimal(Double.random(in: -90...90)).rounded(scale: 6),
+      geoLong: Decimal(Double.random(in: -180...180)).rounded(scale: 6),
       resources: resources ?? randomResources
     )
   }
 
   func createExportedAsset(
     photokitAsset: PhotokitAsset,
-    cityId: Int64?,
-    countryId: Int64?,
     aestheticScore: Int64,
     now: Date,
   ) -> ExportedAsset {
     return ExportedAsset.fromPhotokitAsset(
       asset: photokitAsset,
-      cityId: cityId,
-      countryId: countryId,
       aestheticScore: aestheticScore,
       now: now,
     )!
@@ -115,24 +111,10 @@ struct TestDataGenerator {
     updatedAt: Date? = nil,
     importedAt: Date? = nil,
     isFavourite: Bool? = nil,
-    city: String? = nil,
-    country: String? = nil,
     aestheticScore: Int64? = nil,
     isDeleted: Bool? = nil,
     deletedAt: Date? = nil,
-  ) throws -> ExportedAsset {
-    let cityId: Int64? = if let city {
-      try self.exporterDB.getLookupTableIdByName(
-        table: .city, name: city
-      )
-    } else { nil }
-
-    let countryId: Int64? = if let country {
-      try self.exporterDB.getLookupTableIdByName(
-        table: .country, name: country
-      )
-    } else { nil }
-
+  ) -> ExportedAsset {
     let actualCreatedAt = createdAt ?? Date(
       timeIntervalSince1970: Double(Int.random(in: defaultDateStart...defaultDateEnd))
     )
@@ -153,10 +135,6 @@ struct TestDataGenerator {
       updatedAt: updatedAt ?? randomUpdatedAt,
       importedAt: importedAt ?? randomImportedAt,
       isFavourite: isFavourite ?? Bool.random(),
-      geoLat: Double.random(in: -90...90),
-      geoLong: Double.random(in: -180...180),
-      cityId: cityId,
-      countryId: countryId,
       aestheticScore: aestheticScore ?? Int64.random(in: 1000000...9999999),
       isDeleted: isDeleted ?? false,
       deletedAt: deletedAt
@@ -165,15 +143,11 @@ struct TestDataGenerator {
 
   func createAndSaveExportedAsset(
     photokitAsset: PhotokitAsset,
-    cityId: Int64?,
-    countryId: Int64?,
     aestheticScore: Int64,
     now: Date,
   ) throws -> ExportedAsset {
     let asset = ExportedAsset.fromPhotokitAsset(
       asset: photokitAsset,
-      cityId: cityId,
-      countryId: countryId,
       aestheticScore: aestheticScore,
       now: now,
     )!
@@ -188,21 +162,17 @@ struct TestDataGenerator {
     updatedAt: Date? = nil,
     importedAt: Date? = nil,
     isFavourite: Bool? = nil,
-    city: String? = nil,
-    country: String? = nil,
     aestheticScore: Int64? = nil,
     isDeleted: Bool? = nil,
     deletedAt: Date? = nil,
   ) throws -> ExportedAsset {
-    let asset = try createExportedAsset(
+    let asset = createExportedAsset(
       assetType: assetType,
       assetLibrary: assetLibrary,
       createdAt: createdAt,
       updatedAt: updatedAt,
       importedAt: importedAt,
       isFavourite: isFavourite,
-      city: city,
-      country: country,
       aestheticScore: aestheticScore,
       isDeleted: isDeleted,
       deletedAt: deletedAt,
@@ -214,17 +184,31 @@ struct TestDataGenerator {
   func createExportedFile(
     photokitAsset: PhotokitAsset,
     photokitResource: PhotokitAssetResource,
-    countryOpt: String?,
-    cityOpt: String?,
-    now: Date?,
+    now: Date,
+    country: String?,
+    city: String?,
     wasCopied: Bool? = nil,
-  ) -> ExportedFile {
+  ) throws -> ExportedFile {
+    let cityId: Int64? = if let city {
+      try self.exporterDB.getLookupTableIdByName(
+        table: .city, name: city
+      )
+    } else { nil }
+
+    let countryId: Int64? = if let country {
+      try self.exporterDB.getLookupTableIdByName(
+        table: .country, name: country
+      )
+    } else { nil }
+
     return ExportedFile.fromPhotokitAssetResource(
       asset: photokitAsset,
       resource: photokitResource,
-      countryOpt: countryOpt,
-      cityOpt: cityOpt,
       now: now,
+      countryId: countryId,
+      cityId: cityId,
+      country: country,
+      city: city,
     )!.copy(wasCopied: wasCopied ?? false)
   }
 
@@ -236,28 +220,45 @@ struct TestDataGenerator {
     pixelHeight: Int64? = nil,
     pixelWidth: Int64? = nil,
     importedAt: Date? = nil,
-    city: String? = nil,
     country: String? = nil,
+    city: String? = nil,
     wasCopied: Bool? = nil,
-  ) -> ExportedFile {
+  ) throws -> ExportedFile {
+    let cityId: Int64? = if let city {
+      try self.exporterDB.getLookupTableIdByName(
+        table: .city, name: city
+      )
+    } else { nil }
+
+    let countryId: Int64? = if let country {
+      try self.exporterDB.getLookupTableIdByName(
+        table: .country, name: country
+      )
+    } else { nil }
+
     let randomFileName = "IMG0\(Int.random(in: 1...99999)).jpg"
+    let randomFileSize = fileSize ?? Int64.random(in: 1000000...99999999)
     return ExportedFile(
-      id: UUID().uuidString,
+      id: ExportedFile.generateId(
+        assetCreatedAt: asset.createdAt,
+        fileSize: randomFileSize,
+        fileType: fileType ?? FileType.originalImage,
+        originalFileName: randomFileName,
+      ),
       fileType: fileType ?? FileType.originalImage,
       originalFileName: originalFileName ?? randomFileName,
-      fileSize: fileSize ?? Int64.random(in: 1000000...99999999),
+      geoLat: Decimal(Double.random(in: -90...90)).rounded(scale: 6),
+      geoLong: Decimal(Double.random(in: -180...180)).rounded(scale: 6),
+      countryId: countryId,
+      cityId: cityId,
+      fileSize: randomFileSize,
       pixelHeight: pixelHeight ?? Int64.random(in: 100...5000),
       pixelWidth: pixelWidth ?? Int64.random(in: 100...4000),
       importedAt: importedAt ?? TestHelpers.dateFromStr("2025-03-15 11:30:05")!,
       importedFileDir: FileHelper.pathForDateAndLocation(
-        dateOpt: asset.createdAt,
-        countryOpt: country,
-        cityOpt: city
-      ),
-      importedFileName: FileHelper.filenameWithDateAndEdited(
-        originalFileName: randomFileName,
-        dateOpt: asset.createdAt,
-        isEdited: FileType.originalImage.isEdited()
+        date: asset.createdAt,
+        country: country,
+        city: city
       ),
       wasCopied: wasCopied ?? false,
     )
@@ -271,11 +272,11 @@ struct TestDataGenerator {
     pixelHeight: Int64? = nil,
     pixelWidth: Int64? = nil,
     importedAt: Date? = nil,
-    city: String? = nil,
     country: String? = nil,
+    city: String? = nil,
     wasCopied: Bool? = nil,
   ) throws -> ExportedFile {
-    let file = createExportedFile(
+    let file = try createExportedFile(
       asset: asset,
       fileType: fileType,
       originalFileName: originalFileName,
@@ -283,8 +284,8 @@ struct TestDataGenerator {
       pixelHeight: pixelHeight,
       pixelWidth: pixelWidth,
       importedAt: importedAt,
-      city: city,
       country: country,
+      city: city,
       wasCopied: wasCopied,
     )
     _ = try exporterDB.upsertFile(file: file)
@@ -294,17 +295,31 @@ struct TestDataGenerator {
   func createAndSaveExportedFile(
     photokitAsset: PhotokitAsset,
     photokitResource: PhotokitAssetResource,
-    countryOpt: String?,
-    cityOpt: String?,
-    now: Date?,
+    now: Date,
+    country: String?,
+    city: String?,
     wasCopied: Bool? = nil,
   ) throws -> ExportedFile {
+    let cityId: Int64? = if let city {
+      try self.exporterDB.getLookupTableIdByName(
+        table: .city, name: city
+      )
+    } else { nil }
+
+    let countryId: Int64? = if let country {
+      try self.exporterDB.getLookupTableIdByName(
+        table: .country, name: country
+      )
+    } else { nil }
+
     let file = ExportedFile.fromPhotokitAssetResource(
       asset: photokitAsset,
       resource: photokitResource,
-      countryOpt: countryOpt,
-      cityOpt: cityOpt,
       now: now,
+      countryId: countryId,
+      cityId: cityId,
+      country: country,
+      city: city,
     )!.copy(wasCopied: wasCopied ?? false)
     _ = try exporterDB.upsertFile(file: file)
     return file
@@ -472,6 +487,7 @@ struct TestDataGenerator {
       albumCount: Int.random(in: 0...9999),
       folderCount: Int.random(in: 0...9999),
       fileSizeTotal: Int64.random(in: 10000...9999999),
+      runTime: Decimal(Double.random(in: 10...200)),
     )
   }
 

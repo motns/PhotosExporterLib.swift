@@ -257,3 +257,12 @@ public struct ExportResult: Codable, Sendable, Equatable {
     )
   }
 }
+
+extension ExportResult: DiffableStruct {
+  func getStructDiff(_ other: ExportResult) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.assetExport))
+      .add(diffProperty(other, \.collectionExport))
+      .add(diffProperty(other, \.fileExport))
+  }
+}

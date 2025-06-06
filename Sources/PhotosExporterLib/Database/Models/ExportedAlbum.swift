@@ -17,12 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import GRDB
 
-enum AlbumType: Int, Sendable, Codable {
+enum AlbumType: Int, Sendable, Codable, SingleValueDiffable {
   case user = 1
   case shared = 2
 }
 
-struct ExportedAlbum: Codable, Equatable, Hashable {
+struct ExportedAlbum: Codable {
   let id: String
   let albumType: AlbumType
   let albumFolderId: String
@@ -81,6 +81,16 @@ struct ExportedAlbum: Codable, Equatable, Hashable {
       name: album.title,
       assetIds: Set(album.assetIds),
     )
+  }
+}
+
+extension ExportedAlbum: DiffableStruct {
+  func getStructDiff(_ other: ExportedAlbum) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.id))
+      .add(diffProperty(other, \.albumType))
+      .add(diffProperty(other, \.albumFolderId))
+      .add(diffProperty(other, \.assetIds))
   }
 }
 

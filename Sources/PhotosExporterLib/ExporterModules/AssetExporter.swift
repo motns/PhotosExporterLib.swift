@@ -267,7 +267,7 @@ struct AssetExporter {
   }
 }
 
-public struct AssetExportResult: Codable, Sendable, Equatable {
+public struct AssetExportResult: Codable, Sendable {
   let assetInserted: Int
   let assetUpdated: Int
   let assetUnchanged: Int
@@ -326,5 +326,23 @@ public struct AssetExportResult: Codable, Sendable, Equatable {
       fileMarkedForDeletion: fileMarkedForDeletion ?? self.fileMarkedForDeletion,
       fileDeleted: fileDeleted ?? self.fileDeleted,
     )
+  }
+}
+
+extension AssetExportResult: DiffableStruct {
+  func getStructDiff(_ other: AssetExportResult) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.assetInserted))
+      .add(diffProperty(other, \.assetUpdated))
+      .add(diffProperty(other, \.assetUnchanged))
+      .add(diffProperty(other, \.assetSkipped))
+      .add(diffProperty(other, \.assetMarkedForDeletion))
+      .add(diffProperty(other, \.assetDeleted))
+      .add(diffProperty(other, \.fileInserted))
+      .add(diffProperty(other, \.fileUpdated))
+      .add(diffProperty(other, \.fileUnchanged))
+      .add(diffProperty(other, \.fileSkipped))
+      .add(diffProperty(other, \.fileMarkedForDeletion))
+      .add(diffProperty(other, \.fileDeleted))
   }
 }

@@ -14,23 +14,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import GRDB
+struct SingleValueDiff: Equatable, CustomStringConvertible, PrettyStringConvertible {
+  let left: String
+  let right: String
 
-// Used for querying only - doesn't map to a database table
-struct ExportedFileWithAssetIds: Decodable, FetchableRecord {
-  let exportedFile: ExportedFile
-  let assetIds: [String]
-
-  enum CodingKeys: String, CodingKey {
-    case exportedFile
-    case assetIds = "asset_ids"
+  var description: String {
+    "SingleValueDiff(left: \(left), right: \(right))"
   }
-}
 
-extension ExportedFileWithAssetIds: DiffableStruct {
-  func getStructDiff(_ other: ExportedFileWithAssetIds) -> StructDiff {
-    return StructDiff()
-      .add(diffProperty(other, \.exportedFile))
-      .add(diffProperty(other, \.assetIds))
+  var prettyDescription: String {
+    """
+    Left: \(left)
+    Right: \(right)
+    """
   }
 }

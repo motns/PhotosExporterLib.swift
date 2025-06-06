@@ -18,7 +18,7 @@ import Foundation
 import GRDB
 
 // Used for querying only - doesn't map to a database table
-struct ExportedFileWithLocation: Decodable, FetchableRecord, Equatable {
+struct ExportedFileWithLocation: Decodable, FetchableRecord {
   let exportedFile: ExportedFile
   let createdAt: Date?
   let country: String
@@ -27,5 +27,15 @@ struct ExportedFileWithLocation: Decodable, FetchableRecord, Equatable {
   enum CodingKeys: String, CodingKey {
     case exportedFile, country, city
     case createdAt = "created_at"
+  }
+}
+
+extension ExportedFileWithLocation: DiffableStruct {
+  func getStructDiff(_ other: ExportedFileWithLocation) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.exportedFile))
+      .add(diffProperty(other, \.createdAt))
+      .add(diffProperty(other, \.country))
+      .add(diffProperty(other, \.city))
   }
 }

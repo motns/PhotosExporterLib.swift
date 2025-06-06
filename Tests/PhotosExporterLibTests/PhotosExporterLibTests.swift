@@ -267,7 +267,7 @@ final class PhotosExporterLibTests {
     let initialRes = try await photosExporterLib.export()
     #expect(
       initialRes == expectedInitialRes,
-      "\(initialRes.getDiffAsString(expectedInitialRes) ?? "")"
+      "\(initialRes.diff(expectedInitialRes).prettyDescription)"
     )
 
     let fileDirURL = exportBaseDirURL.appending(path: "files")
@@ -304,7 +304,7 @@ final class PhotosExporterLibTests {
       .sorted(by: { $0.assetId < $1.assetId })
     #expect(
       sortedMockCopyCalls == expectedCopyCalls,
-      "\(Diff.getDiffAsString(sortedMockCopyCalls, expectedCopyCalls) ?? "")"
+      "\(Diff.getDiff(sortedMockCopyCalls, expectedCopyCalls).prettyDescription)"
     )
 
     let albumDirURL = exportBaseDirURL.appending(path: "albums")
@@ -377,37 +377,37 @@ final class PhotosExporterLibTests {
       .createSymlinkCalls.sorted(by: { $0.dest.absoluteString < $1.dest.absoluteString })
     #expect(
       sortedMockSymlinkCalls == expectedSymlinkCalls,
-      "\(Diff.getDiffAsString(sortedMockSymlinkCalls, expectedSymlinkCalls) ?? "")"
+      "\(Diff.getDiff(sortedMockSymlinkCalls, expectedSymlinkCalls).prettyDescription)"
     )
 
     let assetsInDB = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
     #expect(
       assetsInDB == exportedAssets,
-      "\(Diff.getDiffAsString(assetsInDB, exportedAssets) ?? "")"
+      "\(Diff.getDiff(assetsInDB, exportedAssets).prettyDescription)"
     )
 
     let filesInDB = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
     #expect(
       filesInDB == exportedFiles,
-      "\(Diff.getDiffAsString(filesInDB, exportedFiles) ?? "")"
+      "\(Diff.getDiff(filesInDB, exportedFiles).prettyDescription)"
     )
 
     let assetFilesInDB = try exporterDB.getAllAssetFiles().sorted(by: { $0.assetId < $1.assetId })
     #expect(
       assetFilesInDB == assetFiles,
-      "\(Diff.getDiffAsString(assetFilesInDB, assetFiles) ?? "")"
+      "\(Diff.getDiff(assetFilesInDB, assetFiles).prettyDescription)"
     )
 
     let foldersInDB = try exporterDB.getAllFolders().sorted(by: { $0.id < $1.id })
     #expect(
       foldersInDB == exportedFolders,
-      "\(Diff.getDiffAsString(foldersInDB, exportedFolders) ?? "")"
+      "\(Diff.getDiff(foldersInDB, exportedFolders).prettyDescription)"
     )
 
     let albumsInDB = try exporterDB.getAllAlbums().sorted(by: { $0.id < $1.id })
     #expect(
       albumsInDB == exportedAlbums,
-      "\(Diff.getDiffAsString(albumsInDB, exportedAlbums) ?? "")"
+      "\(Diff.getDiff(albumsInDB, exportedAlbums).prettyDescription)"
     )
 
     let historyEntryInDBInitial = try photosExporterLib.lastRun()
@@ -424,7 +424,7 @@ final class PhotosExporterLibTests {
 
     #expect(
       historyEntryInDBInitial == expectedHistoryEntryInitial,
-      "\(historyEntryInDBInitial?.getDiffAsString(expectedHistoryEntryInitial) ?? "")",
+      "\(historyEntryInDBInitial?.diff(expectedHistoryEntryInitial).prettyDescription ?? "empty")",
     )
 
     // - MARK: No change run
@@ -458,7 +458,7 @@ final class PhotosExporterLibTests {
     let noChangeRes = try await photosExporterLib.export()
     #expect(
       noChangeRes == expectedNoChangeRes,
-      "\(noChangeRes.getDiffAsString(expectedNoChangeRes) ?? "")"
+      "\(noChangeRes.diff(expectedNoChangeRes).prettyDescription)"
     )
     // Make sure no new file copy calls have happened
     #expect(photokitMock.copyResourceCalls.count == 3)
@@ -559,32 +559,32 @@ final class PhotosExporterLibTests {
     let updateRes = try await photosExporterLib.export()
     #expect(
       updateRes == expectedUpdateRes,
-      "\(updateRes.getDiffAsString(expectedUpdateRes) ?? "")"
+      "\(updateRes.diff(expectedUpdateRes).prettyDescription)"
     )
 
     let updatedAssetsInDB = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
     #expect(
       updatedAssetsInDB == updatedExportedAssets,
-      "\(Diff.getDiffAsString(updatedAssetsInDB, updatedExportedAssets) ?? "")"
+      "\(Diff.getDiff(updatedAssetsInDB, updatedExportedAssets).prettyDescription)"
     )
 
     let updatedFilesInDB = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
     #expect(
       updatedFilesInDB == updatedExportedFiles,
-      "\(Diff.getDiffAsString(updatedFilesInDB, updatedExportedFiles) ?? "")"
+      "\(Diff.getDiff(updatedFilesInDB, updatedExportedFiles).prettyDescription)"
     )
 
     // Should be unchanged
     let assetFilesInDB2 = try exporterDB.getAllAssetFiles().sorted(by: { $0.assetId < $1.assetId })
     #expect(
       assetFilesInDB2 == assetFiles,
-      "\(Diff.getDiffAsString(assetFilesInDB2, assetFiles) ?? "")"
+      "\(Diff.getDiff(assetFilesInDB2, assetFiles).prettyDescription)"
     )
 
     let updatedAlbumsInDB = try exporterDB.getAllAlbums().sorted(by: { $0.id < $1.id })
     #expect(
       updatedAlbumsInDB == updatedExportedAlbums,
-      "\(Diff.getDiffAsString(updatedAlbumsInDB, updatedExportedAlbums) ?? "")"
+      "\(Diff.getDiff(updatedAlbumsInDB, updatedExportedAlbums).prettyDescription)"
     )
   }
 
@@ -802,26 +802,26 @@ final class PhotosExporterLibTests {
     let markRes = try await photosExporterLib.export()
     #expect(
       markRes == expectedMarkRes,
-      "\(markRes.getDiffAsString(expectedMarkRes) ?? "")"
+      "\(markRes.diff(expectedMarkRes).prettyDescription)"
     )
 
     let assetsInDB = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
     // Avoid using Sets, because they use Hashable instead of Comparable
     #expect(
       assetsInDB == exportedAssets,
-      "\(Diff.getDiffAsString(assetsInDB, exportedAssets) ?? "")"
+      "\(Diff.getDiff(assetsInDB, exportedAssets).prettyDescription)"
     )
 
     let filesInDB = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
     #expect(
       filesInDB == exportedFiles,
-      "\(Diff.getDiffAsString(filesInDB, exportedFiles) ?? "")"
+      "\(Diff.getDiff(filesInDB, exportedFiles).prettyDescription)"
     )
 
     let assetFilesInDB = try exporterDB.getAllAssetFiles().sorted(by: { $0.fileId < $1.fileId })
     #expect(
       assetFilesInDB == assetFiles,
-      "\(Diff.getDiffAsString(assetFilesInDB, assetFiles) ?? "")"
+      "\(Diff.getDiff(assetFilesInDB, assetFiles).prettyDescription)"
     )
 
     let historyEntryInDBMark = try photosExporterLib.lastRun()
@@ -838,7 +838,7 @@ final class PhotosExporterLibTests {
 
     #expect(
       historyEntryInDBMark == expectedHistoryEntryMark,
-      "\(historyEntryInDBMark?.getDiffAsString(expectedHistoryEntryMark) ?? "")",
+      "\(historyEntryInDBMark?.diff(expectedHistoryEntryMark).prettyDescription ?? "empty")",
     )
 
     // - MARK: Second run - no changes
@@ -872,7 +872,7 @@ final class PhotosExporterLibTests {
     let noChangeRes = try await photosExporterLib.export()
     #expect(
       noChangeRes == expectedNoChange,
-      "\(noChangeRes.getDiffAsString(expectedNoChange) ?? "")"
+      "\(noChangeRes.diff(expectedNoChange).prettyDescription)"
     )
 
     let historyEntryInDBNoChange = try photosExporterLib.lastRun()
@@ -889,7 +889,7 @@ final class PhotosExporterLibTests {
 
     #expect(
       historyEntryInDBNoChange == expectedHistoryEntryNoChange,
-      "\(historyEntryInDBNoChange?.getDiffAsString(expectedHistoryEntryNoChange) ?? "")",
+      "\(historyEntryInDBNoChange?.diff(expectedHistoryEntryNoChange).prettyDescription ?? "empty")",
     )
 
     // - MARK: Third run - delete expired
@@ -923,7 +923,7 @@ final class PhotosExporterLibTests {
     let deleteRes = try await photosExporterLib.export()
     #expect(
       deleteRes == expectedDelete,
-      "\(deleteRes.getDiffAsString(expectedDelete) ?? "")"
+      "\(deleteRes.diff(expectedDelete).prettyDescription)"
     )
 
     let exportedAssetsAfterDelete = [
@@ -950,19 +950,19 @@ final class PhotosExporterLibTests {
     let assetsInDBAfterDelete = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
     #expect(
       assetsInDBAfterDelete == exportedAssetsAfterDelete,
-      "\(Diff.getDiffAsString(assetsInDBAfterDelete, exportedAssetsAfterDelete) ?? "")"
+      "\(Diff.getDiff(assetsInDBAfterDelete, exportedAssetsAfterDelete).prettyDescription)"
     )
 
     let filesInDBAfterDelete = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
     #expect(
       filesInDBAfterDelete == exportedFilesAfterDelete,
-      "\(Diff.getDiffAsString(filesInDBAfterDelete, exportedFilesAfterDelete) ?? "")"
+      "\(Diff.getDiff(filesInDBAfterDelete, exportedFilesAfterDelete).prettyDescription)"
     )
 
     let assetFilesInDBAfterDelete = try exporterDB.getAllAssetFiles().sorted(by: { $0.fileId < $1.fileId })
     #expect(
       assetFilesInDBAfterDelete == assetFilesAfterDelete,
-      "\(Diff.getDiffAsString(assetFilesInDBAfterDelete, assetFilesAfterDelete) ?? "")"
+      "\(Diff.getDiff(assetFilesInDBAfterDelete, assetFilesAfterDelete).prettyDescription)"
     )
 
     let historyEntryInDBDelete = try photosExporterLib.lastRun()
@@ -979,7 +979,7 @@ final class PhotosExporterLibTests {
 
     #expect(
       historyEntryInDBDelete == expectedHistoryEntryDelete,
-      "\(historyEntryInDBDelete?.getDiffAsString(expectedHistoryEntryDelete) ?? "")",
+      "\(historyEntryInDBDelete?.diff(expectedHistoryEntryDelete).prettyDescription ?? "empty")",
     )
 
     let fileDirURL = exportBaseDirURL.appending(path: "files")
@@ -1005,7 +1005,7 @@ final class PhotosExporterLibTests {
       .sorted { $0.url.absoluteString < $1.url.absoluteString }
     #expect(
       sortedFilteredRemoveCalls == expectedRemoveCalls,
-      "\(Diff.getDiffAsString(sortedFilteredRemoveCalls, expectedRemoveCalls) ?? "")"
+      "\(Diff.getDiff(sortedFilteredRemoveCalls, expectedRemoveCalls).prettyDescription)"
     )
 
     // - MARK: Fourth run - second expiry run
@@ -1048,7 +1048,7 @@ final class PhotosExporterLibTests {
     let markRes2 = try await photosExporterLib.export()
     #expect(
       markRes2 == expectedMarkRes2,
-      "\(markRes2.getDiffAsString(expectedMarkRes2) ?? "")",
+      "\(markRes2.diff(expectedMarkRes2).prettyDescription)",
     )
 
     let historyEntryInDBMark2 = try photosExporterLib.lastRun()
@@ -1065,7 +1065,7 @@ final class PhotosExporterLibTests {
 
     #expect(
       historyEntryInDBMark2 == expectedHistoryEntryMark2,
-      "\(historyEntryInDBMark2?.getDiffAsString(expectedHistoryEntryMark2) ?? "")",
+      "\(historyEntryInDBMark2?.diff(expectedHistoryEntryMark2).prettyDescription ?? "")",
     )
 
     // - MARK: Final run - second delete
@@ -1100,7 +1100,7 @@ final class PhotosExporterLibTests {
     let deleteRes2 = try await photosExporterLib.export()
     #expect(
       deleteRes2 == expectedDelete2,
-      "\(deleteRes2.getDiffAsString(expectedDelete2) ?? "")"
+      "\(deleteRes2.diff(expectedDelete2).prettyDescription)"
     )
 
     let exportedAssetsAfterDelete2 = [
@@ -1122,19 +1122,19 @@ final class PhotosExporterLibTests {
     let assetsInDBAfterDelete2 = try exporterDB.getAllAssets().sorted(by: { $0.id < $1.id })
     #expect(
       assetsInDBAfterDelete2 == exportedAssetsAfterDelete2,
-      "\(Diff.getDiffAsString(assetsInDBAfterDelete2, exportedAssetsAfterDelete2) ?? "")"
+      "\(Diff.getDiff(assetsInDBAfterDelete2, exportedAssetsAfterDelete2).prettyDescription)"
     )
 
     let filesInDBAfterDelete2 = try exporterDB.getAllFiles().sorted(by: { $0.id < $1.id })
     #expect(
       filesInDBAfterDelete2 == exportedFilesAfterDelete2,
-      "\(Diff.getDiffAsString(filesInDBAfterDelete2, exportedFilesAfterDelete2) ?? "")"
+      "\(Diff.getDiff(filesInDBAfterDelete2, exportedFilesAfterDelete2).prettyDescription)"
     )
 
     let assetFilesInDBAfterDelete2 = try exporterDB.getAllAssetFiles().sorted(by: { $0.fileId < $1.fileId })
     #expect(
       assetFilesInDBAfterDelete2 == assetFilesAfterDelete2,
-      "\(Diff.getDiffAsString(assetFilesInDBAfterDelete2, assetFilesAfterDelete2) ?? "")"
+      "\(Diff.getDiff(assetFilesInDBAfterDelete2, assetFilesAfterDelete2).prettyDescription)"
     )
 
     let historyEntryInDBDelete2 = try photosExporterLib.lastRun()
@@ -1151,7 +1151,7 @@ final class PhotosExporterLibTests {
 
     #expect(
       historyEntryInDBDelete2 == expectedHistoryEntryDelete2,
-      "\(historyEntryInDBDelete2?.getDiffAsString(expectedHistoryEntryDelete2) ?? "")",
+      "\(historyEntryInDBDelete2?.diff(expectedHistoryEntryDelete2).prettyDescription ?? "")",
     )
 
     let expectedRemoveCalls2 = [
@@ -1176,7 +1176,7 @@ final class PhotosExporterLibTests {
       .sorted { $0.url.absoluteString < $1.url.absoluteString }
     #expect(
       sortedFilteredRemoveCalls2 == expectedRemoveCalls2,
-      "\(Diff.getDiffAsString(sortedFilteredRemoveCalls2, expectedRemoveCalls2) ?? "")"
+      "\(Diff.getDiff(sortedFilteredRemoveCalls2, expectedRemoveCalls2).prettyDescription)"
     )
   }
 }

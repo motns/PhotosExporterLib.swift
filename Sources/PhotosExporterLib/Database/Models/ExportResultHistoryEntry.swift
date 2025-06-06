@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import GRDB
 import Foundation
 
-struct ExportResultHistoryEntry: Codable, Equatable {
+struct ExportResultHistoryEntry: Codable {
   let id: String
   let createdAt: Date
   let exportResult: ExportResult
@@ -73,16 +73,6 @@ struct ExportResultHistoryEntry: Codable, Equatable {
     )
   }
 
-  static func == (lhs: ExportResultHistoryEntry, rhs: ExportResultHistoryEntry) -> Bool {
-    return lhs.id == rhs.id
-      && DateHelper.secondsEquals(lhs.createdAt, rhs.createdAt)
-      && lhs.exportResult == rhs.exportResult
-      && lhs.assetCount == rhs.assetCount
-      && lhs.fileCount == rhs.fileCount
-      && lhs.albumCount == rhs.albumCount
-      && lhs.folderCount == rhs.folderCount
-  }
-
   // swiftlint:disable:next function_parameter_count
   static func fromExportResult(
     exportResult: ExportResult,
@@ -103,6 +93,21 @@ struct ExportResultHistoryEntry: Codable, Equatable {
       folderCount: folderCount,
       fileSizeTotal: fileSizeTotal,
     )
+  }
+}
+
+extension ExportResultHistoryEntry: DiffableStruct {
+  func getStructDiff(_ other: ExportResultHistoryEntry) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.id))
+      .add(diffProperty(other, \.createdAt))
+      .add(diffProperty(other, \.exportResult))
+      .add(diffProperty(other, \.assetCount))
+      .add(diffProperty(other, \.fileCount))
+      .add(diffProperty(other, \.albumCount))
+      .add(diffProperty(other, \.folderCount))
+      .add(diffProperty(other, \.fileSizeTotal))
+      .add(diffProperty(other, \.runTime))
   }
 }
 
@@ -145,4 +150,18 @@ public struct HistoryEntry {
   let albumCount: Int
   let folderCount: Int
   let fileSizeTotal: Int64
+
+extension HistoryEntry: DiffableStruct {
+  func getStructDiff(_ other: HistoryEntry) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.id))
+      .add(diffProperty(other, \.createdAt))
+      .add(diffProperty(other, \.exportResult))
+      .add(diffProperty(other, \.assetCount))
+      .add(diffProperty(other, \.fileCount))
+      .add(diffProperty(other, \.albumCount))
+      .add(diffProperty(other, \.folderCount))
+      .add(diffProperty(other, \.fileSizeTotal))
+      .add(diffProperty(other, \.runTime))
+  }
 }

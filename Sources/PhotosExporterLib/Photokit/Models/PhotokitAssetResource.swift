@@ -19,7 +19,7 @@ import Photos
 
 // Copy this Enum so that we can avoid leaking Photokit types into the rest
 // of our library code
-enum PhotokitAssetResourceType: Int, Sendable {
+enum PhotokitAssetResourceType: Int, Sendable, SingleValueDiffable {
   case photo = 1
   case video = 2
   case audio = 3
@@ -122,5 +122,16 @@ struct PhotokitAssetResource: Sendable {
       pixelHeight: Int64(resource.pixelHeight),
       pixelWidth: Int64(resource.pixelWidth),
     )
+  }
+}
+
+extension PhotokitAssetResource: DiffableStruct {
+  func getStructDiff(_ other: PhotokitAssetResource) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.assetResourceType))
+      .add(diffProperty(other, \.originalFileName))
+      .add(diffProperty(other, \.fileSize))
+      .add(diffProperty(other, \.pixelHeight))
+      .add(diffProperty(other, \.pixelWidth))
   }
 }

@@ -50,24 +50,22 @@ class ExporterFileManagerMock: ExporterFileManagerProtocol {
   }
 }
 
-struct CreateSymlinkCall: Hashable, Diffable, DiffableStruct {
+struct CreateSymlinkCall: DiffableStruct {
   let src: URL
   let dest: URL
 
-  func getDiffAsString(_ other: CreateSymlinkCall) -> String? {
-    var out = ""
-    out += propertyDiff("src", self.src, other.src) ?? ""
-    out += propertyDiff("dest", self.dest, other.dest) ?? ""
-    return out != "" ? out : nil
+  func getStructDiff(_ other: CreateSymlinkCall) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.src))
+      .add(diffProperty(other, \.dest))
   }
 }
 
-struct RemoveCall: Diffable, DiffableStruct {
+struct RemoveCall: DiffableStruct {
   let url: URL
 
-  func getDiffAsString(_ other: RemoveCall) -> String? {
-    var out = ""
-    out += propertyDiff("url", self.url, other.url) ?? ""
-    return out != "" ? out : nil
+  func getStructDiff(_ other: RemoveCall) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.url))
   }
 }

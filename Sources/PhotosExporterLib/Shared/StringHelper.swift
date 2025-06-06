@@ -14,23 +14,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import GRDB
-
-// Used for querying only - doesn't map to a database table
-struct ExportedFileWithAssetIds: Decodable, FetchableRecord {
-  let exportedFile: ExportedFile
-  let assetIds: [String]
-
-  enum CodingKeys: String, CodingKey {
-    case exportedFile
-    case assetIds = "asset_ids"
-  }
-}
-
-extension ExportedFileWithAssetIds: DiffableStruct {
-  func getStructDiff(_ other: ExportedFileWithAssetIds) -> StructDiff {
-    return StructDiff()
-      .add(diffProperty(other, \.exportedFile))
-      .add(diffProperty(other, \.assetIds))
+struct StringHelper {
+  static func indent(_ str: String, _ spaces: Int = 2) -> String {
+    let indentation = String(repeating: " ", count: spaces)
+    return str.split(separator: "\n").joined(separator: "\n\(indentation)")
   }
 }

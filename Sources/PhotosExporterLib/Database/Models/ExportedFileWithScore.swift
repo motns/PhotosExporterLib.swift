@@ -17,7 +17,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import GRDB
 
 // Used for querying only - doesn't map to a database table
-struct ExportedFileWithScore: Decodable, FetchableRecord, Equatable {
+struct ExportedFileWithScore: Decodable, FetchableRecord {
   let exportedFile: ExportedFile
   let score: Int64
+}
+
+extension ExportedFileWithScore: DiffableStruct {
+  func getStructDiff(_ other: ExportedFileWithScore) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.exportedFile))
+      .add(diffProperty(other, \.score))
+  }
 }

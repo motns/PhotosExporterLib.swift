@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import GRDB
 
-enum FileType: Int, Sendable, Codable {
+enum FileType: Int, Sendable, Codable, SingleValueDiffable {
   case originalImage = 1
   case originalVideo = 2
   case originalAudio = 3
@@ -49,7 +49,7 @@ enum FileType: Int, Sendable, Codable {
   }
 }
 
-struct ExportedFile: Codable, Equatable, Hashable {
+struct ExportedFile: Codable {
   let id: String
   let fileType: FileType
   let originalFileName: String
@@ -211,6 +211,25 @@ struct ExportedFile: Codable, Equatable, Hashable {
       ),
       wasCopied: false,
     )
+  }
+}
+
+extension ExportedFile: DiffableStruct {
+  func getStructDiff(_ other: ExportedFile) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.id))
+      .add(diffProperty(other, \.fileType))
+      .add(diffProperty(other, \.originalFileName))
+      .add(diffProperty(other, \.geoLat))
+      .add(diffProperty(other, \.geoLong))
+      .add(diffProperty(other, \.countryId))
+      .add(diffProperty(other, \.cityId))
+      .add(diffProperty(other, \.fileSize))
+      .add(diffProperty(other, \.pixelHeight))
+      .add(diffProperty(other, \.pixelWidth))
+      .add(diffProperty(other, \.importedAt))
+      .add(diffProperty(other, \.importedFileDir))
+      .add(diffProperty(other, \.wasCopied))
   }
 }
 

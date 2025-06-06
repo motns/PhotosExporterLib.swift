@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import GRDB
 
-enum AssetType: Int, Sendable, Codable {
+enum AssetType: Int, Sendable, Codable, SingleValueDiffable {
   case image = 1
   case video = 2
   case audio = 3
@@ -32,13 +32,13 @@ enum AssetType: Int, Sendable, Codable {
   }
 }
 
-enum AssetLibrary: Int, Sendable, Codable {
+enum AssetLibrary: Int, Sendable, Codable, SingleValueDiffable {
   case personalLibrary = 1
   case sharedLibrary = 2
   case sharedAlbum = 3
 }
 
-struct ExportedAsset: Codable, Equatable, Hashable {
+struct ExportedAsset: Codable {
   let id: String
   let assetType: AssetType
   let assetLibrary: AssetLibrary
@@ -79,23 +79,6 @@ struct ExportedAsset: Codable, Equatable, Hashable {
       || self.cityId != other.cityId
       || self.countryId != other.countryId
       || self.aestheticScore != other.aestheticScore
-  }
-
-  static func == (lhs: Self, rhs: Self) -> Bool {
-    return lhs.id == rhs.id
-      && lhs.assetType == rhs.assetType
-      && lhs.assetLibrary == rhs.assetLibrary
-      && DateHelper.secondsEquals(lhs.createdAt, rhs.createdAt)
-      && DateHelper.secondsEquals(lhs.updatedAt, rhs.updatedAt)
-      && DateHelper.secondsEquals(lhs.importedAt, rhs.importedAt)
-      && lhs.isFavourite == rhs.isFavourite
-      && lhs.geoLat == rhs.geoLat
-      && lhs.geoLong == rhs.geoLong
-      && lhs.cityId == rhs.cityId
-      && lhs.countryId == rhs.countryId
-      && lhs.aestheticScore == rhs.aestheticScore
-      && lhs.isDeleted == rhs.isDeleted
-      && DateHelper.secondsEquals(lhs.deletedAt, rhs.deletedAt)
   }
 
   func copy(
@@ -175,6 +158,22 @@ struct ExportedAsset: Codable, Equatable, Hashable {
       isDeleted: false, // This is implicitly False, since we're creating it from a Photokit Asset
       deletedAt: nil
     )
+  }
+}
+
+extension ExportedAsset: DiffableStruct {
+  func getStructDiff(_ other: ExportedAsset) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.id))
+      .add(diffProperty(other, \.assetType))
+      .add(diffProperty(other, \.assetLibrary))
+      .add(diffProperty(other, \.createdAt))
+      .add(diffProperty(other, \.updatedAt))
+      .add(diffProperty(other, \.importedAt))
+      .add(diffProperty(other, \.isFavourite))
+      .add(diffProperty(other, \.aestheticScore))
+      .add(diffProperty(other, \.isDeleted))
+      .add(diffProperty(other, \.deletedAt))
   }
 }
 

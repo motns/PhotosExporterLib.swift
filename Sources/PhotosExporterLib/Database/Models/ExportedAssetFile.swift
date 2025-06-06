@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import GRDB
 import Foundation
 
-struct ExportedAssetFile: Codable, Equatable {
+struct ExportedAssetFile: Codable {
   let assetId: String
   let fileId: String
   let isDeleted: Bool
@@ -54,6 +54,16 @@ struct ExportedAssetFile: Codable, Equatable {
       isDeleted: isDeleted ?? self.isDeleted,
       deletedAt: deletedAt ?? self.deletedAt,
     )
+  }
+}
+
+extension ExportedAssetFile: DiffableStruct {
+  func getStructDiff(_ other: ExportedAssetFile) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.assetId))
+      .add(diffProperty(other, \.fileId))
+      .add(diffProperty(other, \.isDeleted))
+      .add(diffProperty(other, \.deletedAt))
   }
 }
 

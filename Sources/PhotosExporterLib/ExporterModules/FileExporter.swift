@@ -164,3 +164,11 @@ struct FileExportResultWithRemoved {
     )
   }
 }
+
+extension FileExportResult: DiffableStruct {
+  func getStructDiff(_ other: FileExportResult) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.copied))
+      .add(diffProperty(other, \.deleted))
+  }
+}

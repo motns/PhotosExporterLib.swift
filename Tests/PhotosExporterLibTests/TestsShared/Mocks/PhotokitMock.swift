@@ -86,18 +86,17 @@ class PhotokitMock: PhotokitProtocol {
   }
 }
 
-struct CopyResourceCall: Diffable, DiffableStruct {
+struct CopyResourceCall: DiffableStruct {
   let assetId: String
   let resourceType: PhotokitAssetResourceType
   let originalFileName: String
   let destination: URL
 
-  func getDiffAsString(_ other: CopyResourceCall) -> String? {
-    var out = ""
-    out += propertyDiff("assetId", self.assetId, other.assetId) ?? ""
-    out += propertyDiff("resourceType", self.resourceType, other.resourceType) ?? ""
-    out += propertyDiff("originalFileName", self.originalFileName, other.originalFileName) ?? ""
-    out += propertyDiff("destination", self.destination, other.destination) ?? ""
-    return out != "" ? out : nil
+  func getStructDiff(_ other: CopyResourceCall) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.assetId))
+      .add(diffProperty(other, \.resourceType))
+      .add(diffProperty(other, \.originalFileName))
+      .add(diffProperty(other, \.destination))
   }
 }
