@@ -31,6 +31,17 @@ struct DateHelper {
     }
   }
 
+  static func truncateToSeconds(_ date: Date) -> Date {
+    return Date(
+      timeIntervalSince1970: Double(Int(date.timeIntervalSince1970))
+    )
+  }
+
+  static func toDebugString(_ date: Date) -> String {
+    let dateTime = ISO8601DateFormatter().string(from: date)
+    return "Date(\(dateTime), \(date.timeIntervalSince1970))"
+  }
+
   static func getYearStr(_ date: Date?) -> String {
     let calendar = Calendar.current
     if let date {

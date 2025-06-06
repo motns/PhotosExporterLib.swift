@@ -30,10 +30,12 @@ struct DefaultTimeProvider: TimeProvider {
     /*
     There's a known issue with Date serialisation, whereby microseconds are truncated:
     https://github.com/swiftlang/swift-foundation/issues/963
-    So the safe option is to use millisecond-precision Dates for now.
+    Also, we don't really need timestamps with sub-second precision, so we'll try to avoid
+    having to deal with Doubles as much as we can.
     */
-    let timestamp = (Date().timeIntervalSince1970 * 1000).rounded() / 1000
-    return Date(timeIntervalSince1970: timestamp)
+    return Date(
+      timeIntervalSince1970: Double(Int(Date().timeIntervalSince1970))
+    )
   }
 
   func secondsPassedSince(_ start: Date) -> TimeInterval {
