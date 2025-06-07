@@ -156,9 +156,7 @@ Apple private framework used by Photos. We'll use it to decode the reverse geolo
 stored in the Photos SQLite DB.
 */
 class PLRevGeoLocationInfo: NSObject, NSSecureCoding {
-  static var supportsSecureCoding: Bool {
-    return true
-  }
+  static let supportsSecureCoding: Bool = true
 
   let postalAddress: CNPostalAddress
 
