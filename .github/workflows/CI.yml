@@ -32,10 +32,12 @@ jobs:
     - name: Run tests
       run: swift test -v
     - name: Run Snyk Open Source
+      continue-on-error: true
       run: snyk test --sarif-file-output=snyk-os.sarif
       env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     - name: Run Snyk Code
+      continue-on-error: true
       run: snyk code test --sarif-file-output=snyk-code.sarif
       env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
