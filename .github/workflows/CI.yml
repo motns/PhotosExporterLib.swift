@@ -31,11 +31,19 @@ jobs:
         version: latest
     - name: Run tests
       run: swift test -v
-    - name: Run Snyk
-      run: snyk test --sarif-file-output=snyk.sarif
+    - name: Run Snyk Open Source
+      run: snyk test --sarif-file-output=snyk-os.sarif
       env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-    - name: Upload Snyk result to GitHub Code Scanning
+    - name: Run Snyk Code
+      run: snyk code test --sarif-file-output=snyk-code.sarif
+      env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    - name: Upload Snyk OS result
       uses: github/codeql-action/upload-sarif@v3
       with:
-        sarif_file: snyk.sarif
+        sarif_file: snyk-os.sarif
+    - name: Upload Snyk Code result
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: snyk-code.sarif
