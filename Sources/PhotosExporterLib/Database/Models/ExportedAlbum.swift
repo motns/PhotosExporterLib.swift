@@ -71,7 +71,7 @@ struct ExportedAlbum: Codable {
     case .albumRegular: .user
     case .albumCloudShared: .shared
     case let collectionSubtype:
-      throw ExporterDBError.unsupportedAlbumType(String(describing: collectionSubtype))
+      throw ExporterDB.Error.unsupportedAlbumType(String(describing: collectionSubtype))
     }
 
     return ExportedAlbum(

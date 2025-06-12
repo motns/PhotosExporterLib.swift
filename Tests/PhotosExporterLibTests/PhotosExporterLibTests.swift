@@ -237,8 +237,8 @@ final class PhotosExporterLibTests {
       exportedAlbum3,
     ].sorted(by: { $0.id < $1.id })
 
-    let expectedInitialRes = ExportResult(
-      assetExport: AssetExportResult(
+    let expectedInitialRes = PhotosExporterLib.Result(
+      assetExport: AssetExporter.Result(
         assetInserted: 3,
         assetUpdated: 0,
         assetUnchanged: 0,
@@ -252,7 +252,7 @@ final class PhotosExporterLibTests {
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
       ),
-      collectionExport: CollectionExportResult(
+      collectionExport: CollectionExporter.Result(
         folderInserted: 3,
         folderUpdated: 0,
         folderUnchanged: 0,
@@ -260,7 +260,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0
       ),
-      fileExport: FileExportResult(copied: 3, deleted: 0)
+      fileExport: FileExporter.Result(copied: 3, deleted: 0)
     )
 
     // - MARK: Initial run
@@ -431,8 +431,8 @@ final class PhotosExporterLibTests {
     // - MARK: No change run
     _ = timeProvider.advanceTime(hours: 2)
 
-    let expectedNoChangeRes = ExportResult(
-      assetExport: AssetExportResult(
+    let expectedNoChangeRes = PhotosExporterLib.Result(
+      assetExport: AssetExporter.Result(
         assetInserted: 0,
         assetUpdated: 0,
         assetUnchanged: 3,
@@ -446,7 +446,7 @@ final class PhotosExporterLibTests {
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
       ),
-      collectionExport: CollectionExportResult(
+      collectionExport: CollectionExporter.Result(
         folderInserted: 0,
         folderUpdated: 0,
         folderUnchanged: 3,
@@ -454,7 +454,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 3
       ),
-      fileExport: FileExportResult(copied: 0, deleted: 0)
+      fileExport: FileExporter.Result(copied: 0, deleted: 0)
     )
     let noChangeRes = try await photosExporterLib.export()
     #expect(
@@ -530,8 +530,8 @@ final class PhotosExporterLibTests {
       exportedAlbum3,
     ].sorted(by: { $0.id < $1.id })
 
-    let expectedUpdateRes = ExportResult(
-      assetExport: AssetExportResult(
+    let expectedUpdateRes = PhotosExporterLib.Result(
+      assetExport: AssetExporter.Result(
         assetInserted: 0,
         assetUpdated: 1,
         assetUnchanged: 2,
@@ -545,7 +545,7 @@ final class PhotosExporterLibTests {
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
       ),
-      collectionExport: CollectionExportResult(
+      collectionExport: CollectionExporter.Result(
         folderInserted: 0,
         folderUpdated: 0,
         folderUnchanged: 3,
@@ -553,7 +553,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 1,
         albumUnchanged: 2
       ),
-      fileExport: FileExportResult(copied: 1, deleted: 0)
+      fileExport: FileExporter.Result(copied: 1, deleted: 0)
     )
     let updateRes = try await photosExporterLib.export()
     #expect(
@@ -764,8 +764,8 @@ final class PhotosExporterLibTests {
     ].sorted { $0.fileId < $1.fileId }
 
     // - MARK: First run - mark for deletion
-    let expectedMarkRes = ExportResult(
-      assetExport: AssetExportResult(
+    let expectedMarkRes = PhotosExporterLib.Result(
+      assetExport: AssetExporter.Result(
         assetInserted: 0,
         assetUpdated: 0,
         assetUnchanged: 4,
@@ -779,7 +779,7 @@ final class PhotosExporterLibTests {
         fileMarkedForDeletion: 2,
         fileDeleted: 0,
       ),
-      collectionExport: CollectionExportResult(
+      collectionExport: CollectionExporter.Result(
         folderInserted: 1,
         folderUpdated: 0,
         folderUnchanged: 0,
@@ -787,7 +787,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
       ),
-      fileExport: FileExportResult(copied: 0, deleted: 0)
+      fileExport: FileExporter.Result(copied: 0, deleted: 0)
     )
 
     let markRes = try await photosExporterLib.export()
@@ -834,8 +834,8 @@ final class PhotosExporterLibTests {
 
     // - MARK: Second run - no changes
     _ = timeProvider.advanceTime(minutes: 10)
-    let expectedNoChange = ExportResult(
-      assetExport: AssetExportResult(
+    let expectedNoChange = PhotosExporterLib.Result(
+      assetExport: AssetExporter.Result(
         assetInserted: 0,
         assetUpdated: 0,
         assetUnchanged: 4,
@@ -849,7 +849,7 @@ final class PhotosExporterLibTests {
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
       ),
-      collectionExport: CollectionExportResult(
+      collectionExport: CollectionExporter.Result(
         folderInserted: 0,
         folderUpdated: 0,
         folderUnchanged: 1,
@@ -857,7 +857,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
       ),
-      fileExport: FileExportResult(copied: 0, deleted: 0)
+      fileExport: FileExporter.Result(copied: 0, deleted: 0)
     )
 
     let noChangeRes = try await photosExporterLib.export()
@@ -887,8 +887,8 @@ final class PhotosExporterLibTests {
     // - MARK: Third run - delete expired
     _ = timeProvider.advanceTime(days: 31)
 
-    let expectedDelete = ExportResult(
-      assetExport: AssetExportResult(
+    let expectedDelete = PhotosExporterLib.Result(
+      assetExport: AssetExporter.Result(
         assetInserted: 0,
         assetUpdated: 0,
         assetUnchanged: 4,
@@ -902,7 +902,7 @@ final class PhotosExporterLibTests {
         fileMarkedForDeletion: 0,
         fileDeleted: 2,
       ),
-      collectionExport: CollectionExportResult(
+      collectionExport: CollectionExporter.Result(
         folderInserted: 0,
         folderUpdated: 0,
         folderUnchanged: 1,
@@ -910,7 +910,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
       ),
-      fileExport: FileExportResult(copied: 0, deleted: 2)
+      fileExport: FileExporter.Result(copied: 0, deleted: 2)
     )
     let deleteRes = try await photosExporterLib.export()
     #expect(
@@ -1013,8 +1013,8 @@ final class PhotosExporterLibTests {
       ),
     ]
 
-    let expectedMarkRes2 = ExportResult(
-      assetExport: AssetExportResult(
+    let expectedMarkRes2 = PhotosExporterLib.Result(
+      assetExport: AssetExporter.Result(
         assetInserted: 0,
         assetUpdated: 0,
         assetUnchanged: 3,
@@ -1028,7 +1028,7 @@ final class PhotosExporterLibTests {
         fileMarkedForDeletion: 2,
         fileDeleted: 0,
       ),
-      collectionExport: CollectionExportResult(
+      collectionExport: CollectionExporter.Result(
         folderInserted: 0,
         folderUpdated: 0,
         folderUnchanged: 1,
@@ -1036,7 +1036,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
       ),
-      fileExport: FileExportResult(copied: 0, deleted: 0)
+      fileExport: FileExporter.Result(copied: 0, deleted: 0)
     )
     let markRes2 = try await photosExporterLib.export()
     #expect(
@@ -1066,8 +1066,8 @@ final class PhotosExporterLibTests {
     _ = timeProvider.advanceTime(days: 31)
     fileManagerMock.resetCalls()
 
-    let expectedDelete2 = ExportResult(
-      assetExport: AssetExportResult(
+    let expectedDelete2 = PhotosExporterLib.Result(
+      assetExport: AssetExporter.Result(
         assetInserted: 0,
         assetUpdated: 0,
         assetUnchanged: 3,
@@ -1081,7 +1081,7 @@ final class PhotosExporterLibTests {
         fileMarkedForDeletion: 0,
         fileDeleted: 2,
       ),
-      collectionExport: CollectionExportResult(
+      collectionExport: CollectionExporter.Result(
         folderInserted: 0,
         folderUpdated: 0,
         folderUnchanged: 1,
@@ -1089,7 +1089,7 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
       ),
-      fileExport: FileExportResult(copied: 0, deleted: 2)
+      fileExport: FileExporter.Result(copied: 0, deleted: 2)
     )
     let deleteRes2 = try await photosExporterLib.export()
     #expect(

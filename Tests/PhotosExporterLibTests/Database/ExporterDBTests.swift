@@ -418,7 +418,7 @@ final class ExporterDBTests {
   func upsertAssetNew() throws {
     let newAsset = dataGen.createExportedAsset()
     let insertRes = try self.exporterDB.upsertAsset(asset: newAsset)
-    #expect(insertRes == UpsertResult.insert)
+    #expect(insertRes == ExporterDB.UpsertResult.insert)
 
     let insertedAsset = try? exporterDB.getAsset(id: newAsset.id)
     #expect(insertedAsset == newAsset)
@@ -431,11 +431,11 @@ final class ExporterDBTests {
     )
 
     let insertRes = try self.exporterDB.upsertAsset(asset: asset)
-    #expect(insertRes == UpsertResult.insert)
+    #expect(insertRes == ExporterDB.UpsertResult.insert)
 
     let updated = asset.copy(isFavourite: true)
     let updateRes = try self.exporterDB.upsertAsset(asset: updated)
-    #expect(updateRes == UpsertResult.update)
+    #expect(updateRes == ExporterDB.UpsertResult.update)
 
     let updatedAsset = try? exporterDB.getAsset(id: asset.id)
     let updatedToCheck = updated.copy(updatedAt: updatedAsset?.updatedAt)
@@ -453,10 +453,10 @@ final class ExporterDBTests {
       city: "London",
     )
     let insertRes = try self.exporterDB.upsertFile(file: newFile)
-    #expect(insertRes == UpsertResult.insert)
+    #expect(insertRes == ExporterDB.UpsertResult.insert)
 
     let duplicateRes = try self.exporterDB.upsertFile(file: newFile)
-    #expect(duplicateRes == UpsertResult.nochange)
+    #expect(duplicateRes == ExporterDB.UpsertResult.nochange)
 
     let insertedFile = try? exporterDB.getFile(id: newFile.id)
     #expect(insertedFile == newFile)
@@ -473,7 +473,7 @@ final class ExporterDBTests {
       city: "London",
     )
     let insertRes = try self.exporterDB.upsertFile(file: newFile)
-    #expect(insertRes == UpsertResult.insert)
+    #expect(insertRes == ExporterDB.UpsertResult.insert)
 
     let updatedFile = newFile.copy(wasCopied: true)
     _ = try exporterDB.upsertFile(file: updatedFile)
@@ -627,7 +627,7 @@ final class ExporterDBTests {
       parentId: nil
     )
     let res = try self.exporterDB.upsertFolder(folder: newFolder)
-    #expect(res == UpsertResult.insert)
+    #expect(res == ExporterDB.UpsertResult.insert)
 
     let folderToCheck = try self.exporterDB.getFolder(id: newFolder.id)
     #expect(folderToCheck == newFolder)
@@ -641,11 +641,11 @@ final class ExporterDBTests {
       parentId: nil
     )
     let insertRes = try self.exporterDB.upsertFolder(folder: newFolder)
-    #expect(insertRes == UpsertResult.insert)
+    #expect(insertRes == ExporterDB.UpsertResult.insert)
 
     let updatedFolder = newFolder.copy(name: "New Name")
     let updatedRes = try self.exporterDB.upsertFolder(folder: updatedFolder)
-    #expect(updatedRes == UpsertResult.update)
+    #expect(updatedRes == ExporterDB.UpsertResult.update)
 
     let folderToCheck = try self.exporterDB.getFolder(id: newFolder.id)
     #expect(folderToCheck == updatedFolder)
@@ -673,7 +673,7 @@ final class ExporterDBTests {
     )
 
     let insertRes = try self.exporterDB.upsertAlbum(album: newAlbum)
-    #expect(insertRes == UpsertResult.insert)
+    #expect(insertRes == ExporterDB.UpsertResult.insert)
 
     let albumToCheck = try self.exporterDB.getAlbum(id: newAlbum.id)
     #expect(albumToCheck == newAlbum)
@@ -700,15 +700,15 @@ final class ExporterDBTests {
       ]
     )
     let insertRes = try self.exporterDB.upsertAlbum(album: newAlbum)
-    #expect(insertRes == UpsertResult.insert)
+    #expect(insertRes == ExporterDB.UpsertResult.insert)
 
     let updatedAlbum = newAlbum.copy(
       name: "Best Photos"
     )
     let updateRes = try self.exporterDB.upsertAlbum(album: updatedAlbum)
-    #expect(updateRes == UpsertResult.update)
+    #expect(updateRes == ExporterDB.UpsertResult.update)
     let nochangeRes = try self.exporterDB.upsertAlbum(album: updatedAlbum)
-    #expect(nochangeRes == UpsertResult.nochange)
+    #expect(nochangeRes == ExporterDB.UpsertResult.nochange)
 
     let albumToCheck = try self.exporterDB.getAlbum(id: newAlbum.id)
     #expect(albumToCheck == updatedAlbum)

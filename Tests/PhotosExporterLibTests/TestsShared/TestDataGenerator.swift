@@ -30,8 +30,8 @@ struct TestDataGenerator {
   func createPostalAddress(
     country: String? = nil,
     city: String? = nil,
-  ) -> PostalAddress {
-    return PostalAddress(
+  ) -> PhotosDB.PostalAddress {
+    return PhotosDB.PostalAddress(
       street: "",
       subLocality: "",
       city: city ?? "London",
@@ -444,9 +444,9 @@ struct TestDataGenerator {
     return album
   }
 
-  func createExportResult() -> ExportResult {
-    return ExportResult(
-      assetExport: AssetExportResult(
+  func createExportResult() -> PhotosExporterLib.Result {
+    return PhotosExporterLib.Result(
+      assetExport: AssetExporter.Result(
         assetInserted: Int.random(in: 0...9999),
         assetUpdated: Int.random(in: 0...9999),
         assetUnchanged: Int.random(in: 0...9999),
@@ -460,7 +460,7 @@ struct TestDataGenerator {
         fileMarkedForDeletion: Int.random(in: 0...9999),
         fileDeleted: Int.random(in: 0...9999),
       ),
-      collectionExport: CollectionExportResult(
+      collectionExport: CollectionExporter.Result(
         folderInserted: Int.random(in: 0...9999),
         folderUpdated: Int.random(in: 0...9999),
         folderUnchanged: Int.random(in: 0...9999),
@@ -468,7 +468,7 @@ struct TestDataGenerator {
         albumUpdated: Int.random(in: 0...9999),
         albumUnchanged: Int.random(in: 0...9999),
       ),
-      fileExport: FileExportResult(
+      fileExport: FileExporter.Result(
         copied: Int.random(in: 0...9999),
         deleted: Int.random(in: 0...9999),
       )

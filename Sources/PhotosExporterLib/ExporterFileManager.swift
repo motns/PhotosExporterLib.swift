@@ -17,26 +17,34 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 
 protocol ExporterFileManagerProtocol {
-  func createDirectory(url: URL) throws -> FileOperationResult
-  func createDirectory(path: String) throws -> FileOperationResult
-  func createSymlink(src: URL, dest: URL) throws -> FileOperationResult
-  func remove(url: URL) throws -> FileOperationResult
+  func createDirectory(url: URL) throws -> ExporterFileManager.Result
+  func createDirectory(path: String) throws -> ExporterFileManager.Result
+  func createSymlink(src: URL, dest: URL) throws -> ExporterFileManager.Result
+  func remove(url: URL) throws -> ExporterFileManager.Result
 }
 
 struct ExporterFileManager: ExporterFileManagerProtocol {
   static let shared = ExporterFileManager()
 
-  func createDirectory(url: URL) throws -> FileOperationResult {
+  enum Error: Swift.Error {
+    case fileExistsAtDirectoryPath(String)
+  }
+
+  enum Result {
+    case exists, notexists, success
+  }
+
+  func createDirectory(url: URL) throws -> Result {
     return try createDirectory(path: url.path(percentEncoded: false))
   }
 
-  func createDirectory(path: String) throws -> FileOperationResult {
+  func createDirectory(path: String) throws -> Result {
     var isDirectory: ObjCBool = false
     if FileManager.default.fileExists(
       atPath: path,
       isDirectory: &isDirectory
     ) && !isDirectory.boolValue {
-      throw FileHelperError.fileExistsAtDirectoryPath(path)
+      throw Error.fileExistsAtDirectoryPath(path)
     }
 
     guard !FileManager.default.fileExists(atPath: path) else {
@@ -51,7 +59,7 @@ struct ExporterFileManager: ExporterFileManagerProtocol {
     return .success
   }
 
-  func createSymlink(src: URL, dest: URL) throws -> FileOperationResult {
+  func createSymlink(src: URL, dest: URL) throws -> Result {
     guard !FileManager.default.fileExists(atPath: dest.path(percentEncoded: false)) else {
       return .exists
     }
@@ -59,7 +67,7 @@ struct ExporterFileManager: ExporterFileManagerProtocol {
     return .success
   }
 
-  func remove(url: URL) throws -> FileOperationResult {
+  func remove(url: URL) throws -> Result {
     guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else {
       return .notexists
     }
@@ -67,8 +75,4 @@ struct ExporterFileManager: ExporterFileManagerProtocol {
     try FileManager.default.removeItem(atPath: url.path(percentEncoded: false))
     return .success
   }
-}
-
-enum FileOperationResult {
-  case exists, notexists, success
 }

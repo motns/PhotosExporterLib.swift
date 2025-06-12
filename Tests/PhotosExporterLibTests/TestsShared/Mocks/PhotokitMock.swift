@@ -25,7 +25,7 @@ class PhotokitMock: PhotokitProtocol {
   var rootFolders: [PhotokitFolder]
 
   public private(set) var copyResourceCalls: [CopyResourceCall]
-  var copyResourceResponse: ResourceCopyResult
+  var copyResourceResponse: Photokit.ResourceCopyResult
 
   init() {
     self.assets = []
@@ -51,7 +51,7 @@ class PhotokitMock: PhotokitProtocol {
     }
 
     guard let index = indexOpt else {
-      throw PhotokitError.invalidAlbumId(albumId)
+      throw Photokit.Error.invalidAlbumId(albumId)
     }
 
     return albums[index].assetIds
@@ -75,7 +75,7 @@ class PhotokitMock: PhotokitProtocol {
     resourceType: PhotokitAssetResourceType,
     originalFileName: String,
     destination: URL,
-  ) async throws -> ResourceCopyResult {
+  ) async throws -> Photokit.ResourceCopyResult {
     copyResourceCalls.append(CopyResourceCall(
       assetId: assetId,
       resourceType: resourceType,

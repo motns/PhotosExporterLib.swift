@@ -54,7 +54,3 @@ struct FileHelper {
               .lowercased()
   }
 }
-
-enum FileHelperError: Error {
-  case fileExistsAtDirectoryPath(String)
-}

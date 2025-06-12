@@ -31,20 +31,20 @@ class ExporterFileManagerMock: ExporterFileManagerProtocol {
     removeCalls = []
   }
 
-  func createDirectory(url: URL) throws -> FileOperationResult {
+  func createDirectory(url: URL) throws -> ExporterFileManager.Result {
     return try ExporterFileManager.shared.createDirectory(url: url)
   }
 
-  func createDirectory(path: String) throws -> FileOperationResult {
+  func createDirectory(path: String) throws -> ExporterFileManager.Result {
     return try ExporterFileManager.shared.createDirectory(path: path)
   }
 
-  func createSymlink(src: URL, dest: URL) throws -> FileOperationResult {
+  func createSymlink(src: URL, dest: URL) throws -> ExporterFileManager.Result {
     createSymlinkCalls.append(CreateSymlinkCall(src: src, dest: dest))
     return .success
   }
 
-  func remove(url: URL) throws -> FileOperationResult {
+  func remove(url: URL) throws -> ExporterFileManager.Result {
     removeCalls.append(RemoveCall(url: url))
     return try ExporterFileManager.shared.remove(url: url)
   }

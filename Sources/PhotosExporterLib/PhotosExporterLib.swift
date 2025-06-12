@@ -31,6 +31,27 @@ public struct PhotosExporterLib {
   private let fileExporter: FileExporter
   private let symlinkCreator: SymlinkCreator
 
+  public struct Result: Codable, Sendable, Equatable {
+    let assetExport: AssetExporter.Result
+    let collectionExport: CollectionExporter.Result
+    let fileExport: FileExporter.Result
+
+    static func empty() -> Result {
+      return Result(
+        assetExport: AssetExporter.Result.empty(),
+        collectionExport: CollectionExporter.Result.empty(),
+        fileExport: FileExporter.Result.empty()
+      )
+    }
+  }
+
+  public enum Error: Swift.Error {
+    case picturesDirectoryNotFound
+    case photosLibraryNotFound(String)
+    case missingPhotosDBFile(String)
+    case unexpectedError(String)
+  }
+
   internal init(
     exportBaseDir: String,
     photokit: PhotokitProtocol,
@@ -142,12 +163,12 @@ public struct PhotosExporterLib {
 
   private static func copyPhotosDB(exportBaseDir: String, logger: ClassLogger) throws {
     guard let picturesDirURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first else {
-      throw PhotosExporterError.picturesDirectoryNotFound
+      throw Error.picturesDirectoryNotFound
     }
 
     let photosLibraryURL = picturesDirURL.appending(path: "Photos Library.photoslibrary")
     guard FileManager.default.fileExists(atPath: photosLibraryURL.path(percentEncoded: false)) else {
-      throw PhotosExporterError.photosLibraryNotFound(photosLibraryURL.path(percentEncoded: false))
+      throw Error.photosLibraryNotFound(photosLibraryURL.path(percentEncoded: false))
     }
 
     let photosLibraryDatabaseDirURL = photosLibraryURL.appending(path: "database")
@@ -165,7 +186,7 @@ public struct PhotosExporterLib {
 
       if !FileManager.default.fileExists(atPath: src.path(percentEncoded: false)) {
         if isRequired {
-          throw PhotosExporterError.missingPhotosDBFile(dbFile)
+          throw Error.missingPhotosDBFile(dbFile)
         }
       } else {
         if FileManager.default.fileExists(atPath: dest.path(percentEncoded: false)) {
@@ -196,7 +217,7 @@ public struct PhotosExporterLib {
     collectionExportEnabled: Bool = true,
     fileManagerEnabled: Bool = true,
     symlinkCreatorEnabled: Bool = true,
-  ) async throws -> ExportResult {
+  ) async throws -> Result {
     logger.info("Running Export...")
     let startDate = timeProvider.getDate()
 
@@ -205,7 +226,7 @@ public struct PhotosExporterLib {
     let fileManagerResult = try await fileExporter.run(isEnabled: fileManagerEnabled)
     try symlinkCreator.create(isEnabled: symlinkCreatorEnabled)
 
-    let exportResult = ExportResult(
+    let exportResult = Result(
       assetExport: exportAssetResult.copy(
         fileMarkedForDeletion: exportAssetResult.fileMarkedForDeletion + fileManagerResult.fileMarkedForDeletion
       ),
@@ -239,29 +260,8 @@ public struct PhotosExporterLib {
   }
 }
 
-public enum PhotosExporterError: Error {
-  case picturesDirectoryNotFound
-  case photosLibraryNotFound(String)
-  case missingPhotosDBFile(String)
-  case unexpectedError(String)
-}
-
-public struct ExportResult: Codable, Sendable, Equatable {
-  let assetExport: AssetExportResult
-  let collectionExport: CollectionExportResult
-  let fileExport: FileExportResult
-
-  static func empty() -> ExportResult {
-    return ExportResult(
-      assetExport: AssetExportResult.empty(),
-      collectionExport: CollectionExportResult.empty(),
-      fileExport: FileExportResult.empty()
-    )
-  }
-}
-
-extension ExportResult: DiffableStruct {
-  func getStructDiff(_ other: ExportResult) -> StructDiff {
+extension PhotosExporterLib.Result: DiffableStruct {
+  func getStructDiff(_ other: PhotosExporterLib.Result) -> StructDiff {
     return StructDiff()
       .add(diffProperty(other, \.assetExport))
       .add(diffProperty(other, \.collectionExport))

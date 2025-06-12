@@ -25,6 +25,27 @@ struct FileExporter {
   private let timeProvider: TimeProvider
   private let logger: ClassLogger
 
+  public struct Result: Codable, Sendable, Equatable {
+    let copied: Int
+    let deleted: Int
+
+    static func empty() -> Result {
+      return Result(copied: 0, deleted: 0)
+    }
+  }
+
+  struct ResultWithRemoved {
+    let result: Result
+    let fileMarkedForDeletion: Int
+
+    static func empty() -> ResultWithRemoved {
+      return ResultWithRemoved(
+        result: Result.empty(),
+        fileMarkedForDeletion: 0,
+      )
+    }
+  }
+
   init(
     filesDirURL: URL,
     exporterDB: ExporterDB,
@@ -41,18 +62,18 @@ struct FileExporter {
     self.logger = ClassLogger(logger: logger, className: "FileCopier")
   }
 
-  func run(isEnabled: Bool = false) async throws -> FileExportResultWithRemoved {
+  func run(isEnabled: Bool = false) async throws -> ResultWithRemoved {
     guard isEnabled else {
       logger.warning("File copying and deletion disabled - skipping")
-      return FileExportResultWithRemoved.empty()
+      return ResultWithRemoved.empty()
     }
     let startDate = timeProvider.getDate()
     let copyRes = try await copy()
     let deletedCnt = try delete()
 
     logger.info("File copying and deletion complete in \(timeProvider.secondsPassedSince(startDate))s")
-    return FileExportResultWithRemoved(
-      result: FileExportResult(
+    return ResultWithRemoved(
+      result: Result(
         copied: copyRes.result.copied,
         deleted: deletedCnt,
       ),
@@ -60,13 +81,13 @@ struct FileExporter {
     )
   }
 
-  private func copy() async throws -> FileExportResultWithRemoved {
+  private func copy() async throws -> ResultWithRemoved {
     logger.info("Getting Files to copy from local DB...")
     let filesWithAssetIdToCopy = try exporterDB.getFilesWithAssetIdsToCopy()
 
     guard filesWithAssetIdToCopy.count > 0 else {
       logger.info("No Files to copy")
-      return FileExportResultWithRemoved.empty()
+      return ResultWithRemoved.empty()
     }
 
     logger.info("Copying files...")
@@ -107,8 +128,8 @@ struct FileExporter {
       logger.trace("File updated in DB", loggerMetadata)
     }
 
-    return FileExportResultWithRemoved(
-      result: FileExportResult(copied: copiedCnt, deleted: 0),
+    return ResultWithRemoved(
+      result: Result(copied: copiedCnt, deleted: 0),
       fileMarkedForDeletion: markedForDeletionCnt,
     )
   }
@@ -144,31 +165,18 @@ struct FileExporter {
   }
 }
 
-public struct FileExportResult: Codable, Sendable, Equatable {
-  let copied: Int
-  let deleted: Int
-
-  static func empty() -> FileExportResult {
-    return FileExportResult(copied: 0, deleted: 0)
-  }
-}
-
-struct FileExportResultWithRemoved {
-  let result: FileExportResult
-  let fileMarkedForDeletion: Int
-
-  static func empty() -> FileExportResultWithRemoved {
-    return FileExportResultWithRemoved(
-      result: FileExportResult.empty(),
-      fileMarkedForDeletion: 0,
-    )
-  }
-}
-
-extension FileExportResult: DiffableStruct {
-  func getStructDiff(_ other: FileExportResult) -> StructDiff {
+extension FileExporter.Result: DiffableStruct {
+  func getStructDiff(_ other: FileExporter.Result) -> StructDiff {
     return StructDiff()
       .add(diffProperty(other, \.copied))
       .add(diffProperty(other, \.deleted))
+  }
+}
+
+extension FileExporter.ResultWithRemoved: DiffableStruct {
+  func getStructDiff(_ other: FileExporter.ResultWithRemoved) -> StructDiff {
+    return StructDiff()
+      .add(diffProperty(other, \.result))
+      .add(diffProperty(other, \.fileMarkedForDeletion))
   }
 }

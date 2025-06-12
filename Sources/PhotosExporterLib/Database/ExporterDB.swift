@@ -26,6 +26,26 @@ struct ExporterDB {
   private let dbQueue: DatabaseQueue
   private let logger: ClassLogger
 
+  public enum UpsertResult {
+    case insert, update, nochange
+
+    func merge(_ other: UpsertResult) -> UpsertResult {
+      return (self == .nochange) ? other : self
+    }
+  }
+
+  public enum InsertResult {
+    case insert, duplicate
+  }
+
+  public enum Error: Swift.Error {
+    case connectionFailed(String)
+    case missingMigrationBundle(String)
+    case migrationFailed(String)
+    case assetConversionFailed(String)
+    case unsupportedAlbumType(String)
+  }
+
   init(
     exportDBPath: String,
     logger: Logger,
@@ -38,7 +58,7 @@ struct ExporterDB {
       self.logger.debug("Connected to Export DB")
     } catch {
       self.logger.critical("Failed to connect to ExporterDB")
-      throw ExporterDBError.connectionFailed("\(error)")
+      throw Error.connectionFailed("\(error)")
     }
 
     do {
@@ -49,7 +69,7 @@ struct ExporterDB {
       self.logger.critical("Failed to migrate ExporterDB", [
         "error": "\(error)"
       ])
-      throw ExporterDBError.migrationFailed("\(error)")
+      throw Error.migrationFailed("\(error)")
     }
   }
 }
@@ -694,24 +714,4 @@ extension ExporterDB {
       try entry.insert(db)
     }
   }
-}
-
-enum UpsertResult {
-  case insert, update, nochange
-
-  func merge(_ other: UpsertResult) -> UpsertResult {
-    return (self == .nochange) ? other : self
-  }
-}
-
-enum InsertResult {
-  case insert, duplicate
-}
-
-enum ExporterDBError: Error {
-  case connectionFailed(String)
-  case missingMigrationBundle(String)
-  case migrationFailed(String)
-  case assetConversionFailed(String)
-  case unsupportedAlbumType(String)
 }

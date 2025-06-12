@@ -61,7 +61,7 @@ final class PhotosDBTests {
     let locationsById = try photosDB.getAllAssetLocationsById()
 
     let expected = [
-      "A3891C03-91F5-4E01-B005-4E4F2DF63853": PostalAddress(
+      "A3891C03-91F5-4E01-B005-4E4F2DF63853": PhotosDB.PostalAddress(
         street: "Thames Path",
         subLocality: "Lambeth",
         city: "London",
@@ -71,7 +71,7 @@ final class PhotosDBTests {
         country: "United Kingdom",
         isoCountryCode: "GB"
       ),
-      "AEB097DA-DD3B-45E7-B19F-3F9145768E22": PostalAddress(
+      "AEB097DA-DD3B-45E7-B19F-3F9145768E22": PhotosDB.PostalAddress(
         street: "",
         subLocality: "Sant Antoni",
         city: "Alicante",
@@ -81,7 +81,7 @@ final class PhotosDBTests {
         country: "Spain",
         isoCountryCode: "ES"
       ),
-      "EF45AD5A-5DE3-430E-AD0E-E8EF1A7E7A15": PostalAddress(
+      "EF45AD5A-5DE3-430E-AD0E-E8EF1A7E7A15": PhotosDB.PostalAddress(
         street: "Id Antall József rakpart",
         subLocality: "District V",
         city: "Budapest",
@@ -91,7 +91,7 @@ final class PhotosDBTests {
         country: "Hungary",
         isoCountryCode: "HU"
       ),
-      "FC48CB6F-9135-49AE-BB3C-2C11AC4CF97D": PostalAddress(
+      "FC48CB6F-9135-49AE-BB3C-2C11AC4CF97D": PhotosDB.PostalAddress(
         street: "1–15 Lower New Change Passage",
         subLocality: "City of London",
         city: "London",

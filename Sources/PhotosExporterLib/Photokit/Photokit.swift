@@ -32,7 +32,7 @@ protocol PhotokitProtocol {
     resourceType: PhotokitAssetResourceType,
     originalFileName: String,
     destination: URL,
-  ) async throws -> ResourceCopyResult
+  ) async throws -> Photokit.ResourceCopyResult
 }
 
 /*
@@ -43,6 +43,19 @@ struct Photokit: PhotokitProtocol {
   private let logger: ClassLogger
 
   static let RootFolderId = "ROOT"
+
+  public enum Error: Swift.Error {
+    case authotisationError(String)
+    case invalidCollectionListId(String)
+    case missingParentId
+    case invalidAlbumId(String)
+    case unsupportedAlbumType(Int)
+    case unexpectedError(String)
+  }
+
+  public enum ResourceCopyResult: Sendable {
+    case copied, exists, removed
+  }
 
   init(logger: Logger) async throws {
     self.logger = ClassLogger(
@@ -65,11 +78,11 @@ struct Photokit: PhotokitProtocol {
     case .authorized:
       logger.debug("Already authorised :)")
     case .limited:
-      throw PhotokitError.authotisationError("App only has limited access - please grant full permission")
+      throw Error.authotisationError("App only has limited access - please grant full permission")
     case .restricted:
-      throw PhotokitError.authotisationError("You do not have permissions to give access to the Photos library")
+      throw Error.authotisationError("You do not have permissions to give access to the Photos library")
     case .denied:
-      throw PhotokitError.authotisationError(
+      throw Error.authotisationError(
         "Access to Photos has been denied to exporter - please grant full permission"
       )
     case .notDetermined:
@@ -79,12 +92,12 @@ struct Photokit: PhotokitProtocol {
         logger.debug("Received authorisation :D")
         return
       case .limited, .restricted, .denied, .notDetermined:
-        throw PhotokitError.authotisationError("You must grant full permission to the exporter")
+        throw Error.authotisationError("You must grant full permission to the exporter")
       @unknown default:
-        throw PhotokitError.unexpectedError("Received unrecognised authorisation status")
+        throw Error.unexpectedError("Received unrecognised authorisation status")
       }
     @unknown default:
-      throw PhotokitError.unexpectedError("Current authorisation status not recognised")
+      throw Error.unexpectedError("Current authorisation status not recognised")
     }
   }
 
@@ -174,7 +187,7 @@ struct Photokit: PhotokitProtocol {
     )).first
 
     guard let album = albumOpt else {
-      throw PhotokitError.invalidAlbumId(albumId)
+      throw Error.invalidAlbumId(albumId)
     }
 
     var assetIds = [String]()
@@ -225,7 +238,7 @@ struct Photokit: PhotokitProtocol {
       )).first
 
       guard let collectionWithId = collectionWithIdOpt else {
-        throw PhotokitError.invalidCollectionListId(folderId)
+        throw Error.invalidCollectionListId(folderId)
       }
 
       folderOpt = collectionWithId
@@ -293,7 +306,7 @@ struct Photokit: PhotokitProtocol {
         loggerMetadata
       )
       var fileSize: Int64 = 0
-      return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int64, Error>) in
+      return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int64, Swift.Error>) in
         PHAssetResourceManager.default().requestData(
           for: resource,
           options: nil,
@@ -341,17 +354,4 @@ struct Photokit: PhotokitProtocol {
     try await PHAssetResourceManager.default().writeData(for: resource, toFile: destination, options: nil)
     return ResourceCopyResult.copied
   }
-}
-
-enum PhotokitError: Error {
-  case authotisationError(String)
-  case invalidCollectionListId(String)
-  case missingParentId
-  case invalidAlbumId(String)
-  case unsupportedAlbumType(Int)
-  case unexpectedError(String)
-}
-
-enum ResourceCopyResult: Sendable {
-  case copied, exists, removed
 }

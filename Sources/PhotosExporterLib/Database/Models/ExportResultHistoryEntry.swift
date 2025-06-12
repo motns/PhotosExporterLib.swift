@@ -20,7 +20,7 @@ import Foundation
 struct ExportResultHistoryEntry: Codable {
   let id: String
   let createdAt: Date
-  let exportResult: ExportResult
+  let exportResult: PhotosExporterLib.Result
   let assetCount: Int
   let fileCount: Int
   let albumCount: Int
@@ -43,7 +43,7 @@ struct ExportResultHistoryEntry: Codable {
   func copy(
     id: String? = nil,
     createdAt: Date? = nil,
-    exportResult: ExportResult? = nil,
+    exportResult: PhotosExporterLib.Result? = nil,
     assetCount: Int? = nil,
     fileCount: Int? = nil,
     albumCount: Int? = nil,
@@ -80,7 +80,7 @@ struct ExportResultHistoryEntry: Codable {
 
   // swiftlint:disable:next function_parameter_count
   static func fromExportResult(
-    exportResult: ExportResult,
+    exportResult: PhotosExporterLib.Result,
     assetCount: Int,
     fileCount: Int,
     albumCount: Int,
@@ -153,7 +153,7 @@ extension ExportResultHistoryEntry: Identifiable, FetchableRecord, PersistableRe
 public struct HistoryEntry {
   let id: String
   let createdAt: Date
-  let exportResult: ExportResult
+  let exportResult: PhotosExporterLib.Result
   let assetCount: Int
   let fileCount: Int
   let albumCount: Int

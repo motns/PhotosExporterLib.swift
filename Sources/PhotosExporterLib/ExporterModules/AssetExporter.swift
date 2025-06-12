@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import Logging
 
+// swiftlint:disable:next type_body_length
 struct AssetExporter {
   private var exporterDB: ExporterDB
   private var photosDB: PhotosDBProtocol
@@ -26,6 +27,68 @@ struct AssetExporter {
   private var logger: ClassLogger
   private var timeProvider: TimeProvider
   private let expiryDays: Int
+
+  public struct Result: Codable, Sendable {
+    let assetInserted: Int
+    let assetUpdated: Int
+    let assetUnchanged: Int
+    let assetSkipped: Int
+    let assetMarkedForDeletion: Int
+    let assetDeleted: Int
+    let fileInserted: Int
+    let fileUpdated: Int
+    let fileUnchanged: Int
+    let fileSkipped: Int
+    let fileMarkedForDeletion: Int
+    let fileDeleted: Int
+
+    static func empty() -> Result {
+      return Result(
+        assetInserted: 0,
+        assetUpdated: 0,
+        assetUnchanged: 0,
+        assetSkipped: 0,
+        assetMarkedForDeletion: 0,
+        assetDeleted: 0,
+        fileInserted: 0,
+        fileUpdated: 0,
+        fileUnchanged: 0,
+        fileSkipped: 0,
+        fileMarkedForDeletion: 0,
+        fileDeleted: 0,
+      )
+    }
+
+    func copy(
+      assetInserted: Int? = nil,
+      assetUpdated: Int? = nil,
+      assetUnchanged: Int? = nil,
+      assetSkipped: Int? = nil,
+      assetMarkedForDeletion: Int? = nil,
+      assetDeleted: Int? = nil,
+      fileInserted: Int? = nil,
+      fileUpdated: Int? = nil,
+      fileUnchanged: Int? = nil,
+      fileSkipped: Int? = nil,
+      fileMarkedForDeletion: Int? = nil,
+      fileDeleted: Int? = nil,
+    ) -> Result {
+      return Result(
+        assetInserted: assetInserted ?? self.assetInserted,
+        assetUpdated: assetUpdated ?? self.assetUpdated,
+        assetUnchanged: assetUnchanged ?? self.assetUnchanged,
+        assetSkipped: assetSkipped ?? self.assetSkipped,
+        assetMarkedForDeletion: assetMarkedForDeletion ?? self.assetMarkedForDeletion,
+        assetDeleted: assetDeleted ?? self.assetDeleted,
+        fileInserted: fileInserted ?? self.fileInserted,
+        fileUpdated: fileUpdated ?? self.fileUpdated,
+        fileUnchanged: fileUnchanged ?? self.fileUnchanged,
+        fileSkipped: fileSkipped ?? self.fileSkipped,
+        fileMarkedForDeletion: fileMarkedForDeletion ?? self.fileMarkedForDeletion,
+        fileDeleted: fileDeleted ?? self.fileDeleted,
+      )
+    }
+  }
 
   init(
     exporterDB: ExporterDB,
@@ -45,10 +108,10 @@ struct AssetExporter {
     self.expiryDays = expiryDays
   }
 
-  func export(isEnabled: Bool = true) async throws -> AssetExportResult {
+  func export(isEnabled: Bool = true) async throws -> Result {
     guard isEnabled else {
       logger.warning("Asset export disabled - skipping")
-      return AssetExportResult.empty()
+      return Result.empty()
     }
     let startDate = timeProvider.getDate()
     let assetExportResult = try await exportAssets()
@@ -63,14 +126,14 @@ struct AssetExporter {
     )
   }
 
-  private func exportAssets() async throws -> AssetExportResult {
+  private func exportAssets() async throws -> Result {
     logger.info("Exporting Assets to local DB...")
 
     let assetLocationById = try photosDB.getAllAssetLocationsById()
     let assetScoreById = try photosDB.getAllAssetScoresById()
     let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
-    var assetResults = [UpsertResult?]()
-    var fileResults = [UpsertResult?]()
+    var assetResults = [ExporterDB.UpsertResult?]()
+    var fileResults = [ExporterDB.UpsertResult?]()
 
     while let photokitAsset = try await allPhotokitAssetsResult.next() {
       let assetLocation = assetLocationById[photokitAsset.uuid]
@@ -123,7 +186,7 @@ struct AssetExporter {
     cityId: Int64?,
     country: String?,
     city: String?,
-  ) throws -> UpsertResult? {
+  ) throws -> ExporterDB.UpsertResult? {
     // Filter out supplementary files like adjustment data
     guard FileType.fromPhotokitAssetResourceType(resource.assetResourceType) != nil else {
       logger.trace(
@@ -221,9 +284,9 @@ struct AssetExporter {
 
   // swiftlint:disable:next cyclomatic_complexity
   private func sumUpsertResults(
-    assetResults: [UpsertResult?],
-    fileResults: [UpsertResult?],
-  ) -> AssetExportResult {
+    assetResults: [ExporterDB.UpsertResult?],
+    fileResults: [ExporterDB.UpsertResult?],
+  ) -> Result {
     var assetInsertCnt = 0
     var assetUpdateCnt = 0
     var assetUnchangedCnt = 0
@@ -258,7 +321,7 @@ struct AssetExporter {
       }
     }
 
-    return AssetExportResult(
+    return Result(
       assetInserted: assetInsertCnt,
       assetUpdated: assetUpdateCnt,
       assetUnchanged: assetUnchangedCnt,
@@ -275,70 +338,8 @@ struct AssetExporter {
   }
 }
 
-public struct AssetExportResult: Codable, Sendable {
-  let assetInserted: Int
-  let assetUpdated: Int
-  let assetUnchanged: Int
-  let assetSkipped: Int
-  let assetMarkedForDeletion: Int
-  let assetDeleted: Int
-  let fileInserted: Int
-  let fileUpdated: Int
-  let fileUnchanged: Int
-  let fileSkipped: Int
-  let fileMarkedForDeletion: Int
-  let fileDeleted: Int
-
-  static func empty() -> AssetExportResult {
-    return AssetExportResult(
-      assetInserted: 0,
-      assetUpdated: 0,
-      assetUnchanged: 0,
-      assetSkipped: 0,
-      assetMarkedForDeletion: 0,
-      assetDeleted: 0,
-      fileInserted: 0,
-      fileUpdated: 0,
-      fileUnchanged: 0,
-      fileSkipped: 0,
-      fileMarkedForDeletion: 0,
-      fileDeleted: 0,
-    )
-  }
-
-  func copy(
-    assetInserted: Int? = nil,
-    assetUpdated: Int? = nil,
-    assetUnchanged: Int? = nil,
-    assetSkipped: Int? = nil,
-    assetMarkedForDeletion: Int? = nil,
-    assetDeleted: Int? = nil,
-    fileInserted: Int? = nil,
-    fileUpdated: Int? = nil,
-    fileUnchanged: Int? = nil,
-    fileSkipped: Int? = nil,
-    fileMarkedForDeletion: Int? = nil,
-    fileDeleted: Int? = nil,
-  ) -> AssetExportResult {
-    return AssetExportResult(
-      assetInserted: assetInserted ?? self.assetInserted,
-      assetUpdated: assetUpdated ?? self.assetUpdated,
-      assetUnchanged: assetUnchanged ?? self.assetUnchanged,
-      assetSkipped: assetSkipped ?? self.assetSkipped,
-      assetMarkedForDeletion: assetMarkedForDeletion ?? self.assetMarkedForDeletion,
-      assetDeleted: assetDeleted ?? self.assetDeleted,
-      fileInserted: fileInserted ?? self.fileInserted,
-      fileUpdated: fileUpdated ?? self.fileUpdated,
-      fileUnchanged: fileUnchanged ?? self.fileUnchanged,
-      fileSkipped: fileSkipped ?? self.fileSkipped,
-      fileMarkedForDeletion: fileMarkedForDeletion ?? self.fileMarkedForDeletion,
-      fileDeleted: fileDeleted ?? self.fileDeleted,
-    )
-  }
-}
-
-extension AssetExportResult: DiffableStruct {
-  func getStructDiff(_ other: AssetExportResult) -> StructDiff {
+extension AssetExporter.Result: DiffableStruct {
+  func getStructDiff(_ other: AssetExporter.Result) -> StructDiff {
     return StructDiff()
       .add(diffProperty(other, \.assetInserted))
       .add(diffProperty(other, \.assetUpdated))

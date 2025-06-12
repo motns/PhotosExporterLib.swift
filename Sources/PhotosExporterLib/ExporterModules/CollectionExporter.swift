@@ -22,6 +22,44 @@ struct CollectionExporter {
   private let timeProvider: TimeProvider
   private let logger: ClassLogger
 
+  public struct Result: Codable, Sendable, Equatable {
+    let folderInserted: Int
+    let folderUpdated: Int
+    let folderUnchanged: Int
+    let albumInserted: Int
+    let albumUpdated: Int
+    let albumUnchanged: Int
+
+    func copy(
+      folderInserted: Int? = nil,
+      folderUpdated: Int? = nil,
+      folderUnchanged: Int? = nil,
+      albumInserted: Int? = nil,
+      albumUpdated: Int? = nil,
+      albumUnchanged: Int? = nil,
+    ) -> Result {
+      return Result(
+        folderInserted: folderInserted ?? self.folderInserted,
+        folderUpdated: folderUpdated ?? self.folderUpdated,
+        folderUnchanged: folderUnchanged ?? self.folderUnchanged,
+        albumInserted: albumInserted ?? self.albumInserted,
+        albumUpdated: albumUpdated ?? self.albumUpdated,
+        albumUnchanged: albumUnchanged ?? self.albumUnchanged,
+      )
+    }
+
+    static func empty() -> Result {
+      return Result(
+        folderInserted: 0,
+        folderUpdated: 0,
+        folderUnchanged: 0,
+        albumInserted: 0,
+        albumUpdated: 0,
+        albumUnchanged: 0
+      )
+    }
+  }
+
   init(
     exporterDB: ExporterDB,
     photokit: PhotokitProtocol,
@@ -34,10 +72,10 @@ struct CollectionExporter {
     self.logger = ClassLogger(logger: logger, className: "CollectionExporter")
   }
 
-  func export(isEnabled: Bool = true) throws -> CollectionExportResult {
+  func export(isEnabled: Bool = true) throws -> Result {
     guard isEnabled else {
       logger.warning("Collection export disabled - skipping")
-      return CollectionExportResult.empty()
+      return Result.empty()
     }
     logger.info("Exporting Folders and Albums to local DB...")
     let startDate = timeProvider.getDate()
@@ -78,7 +116,7 @@ struct CollectionExporter {
   private func processPhotokitFolder(
     folder: PhotokitFolder,
     parentId: String?,
-  ) throws -> CollectionExportResult {
+  ) throws -> Result {
     let loggerMetadata: Logger.Metadata = [
       "folder_id": "\(folder.id)"
     ]
@@ -125,7 +163,7 @@ struct CollectionExporter {
       albumUnchangedCnt += subfolderRes.albumUnchanged
     }
 
-    return CollectionExportResult(
+    return Result(
       folderInserted: folderInsertedCnt,
       folderUpdated: folderUpdatedCnt,
       folderUnchanged: folderUnchangedCnt,
@@ -136,46 +174,8 @@ struct CollectionExporter {
   }
 }
 
-public struct CollectionExportResult: Codable, Sendable, Equatable {
-  let folderInserted: Int
-  let folderUpdated: Int
-  let folderUnchanged: Int
-  let albumInserted: Int
-  let albumUpdated: Int
-  let albumUnchanged: Int
-
-  func copy(
-    folderInserted: Int? = nil,
-    folderUpdated: Int? = nil,
-    folderUnchanged: Int? = nil,
-    albumInserted: Int? = nil,
-    albumUpdated: Int? = nil,
-    albumUnchanged: Int? = nil,
-  ) -> CollectionExportResult {
-    return CollectionExportResult(
-      folderInserted: folderInserted ?? self.folderInserted,
-      folderUpdated: folderUpdated ?? self.folderUpdated,
-      folderUnchanged: folderUnchanged ?? self.folderUnchanged,
-      albumInserted: albumInserted ?? self.albumInserted,
-      albumUpdated: albumUpdated ?? self.albumUpdated,
-      albumUnchanged: albumUnchanged ?? self.albumUnchanged,
-    )
-  }
-
-  static func empty() -> CollectionExportResult {
-    return CollectionExportResult(
-      folderInserted: 0,
-      folderUpdated: 0,
-      folderUnchanged: 0,
-      albumInserted: 0,
-      albumUpdated: 0,
-      albumUnchanged: 0
-    )
-  }
-}
-
-extension CollectionExportResult: DiffableStruct {
-  func getStructDiff(_ other: CollectionExportResult) -> StructDiff {
+extension CollectionExporter.Result: DiffableStruct {
+  func getStructDiff(_ other: CollectionExporter.Result) -> StructDiff {
     return StructDiff()
       .add(diffProperty(other, \.folderInserted))
       .add(diffProperty(other, \.folderUpdated))

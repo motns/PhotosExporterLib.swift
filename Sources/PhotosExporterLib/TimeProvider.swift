@@ -42,7 +42,3 @@ struct DefaultTimeProvider: TimeProvider {
     return getDate().timeIntervalSince(start)
   }
 }
-
-enum TimeProviderError: Error {
-  case invalidTimeString(String)
-}

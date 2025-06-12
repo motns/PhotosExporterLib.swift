@@ -21,12 +21,28 @@ import GRDB
 
 protocol PhotosDBProtocol {
   func getAllAssetScoresById() throws -> [String: Int64]
-  func getAllAssetLocationsById() throws -> [String: PostalAddress]
+  func getAllAssetLocationsById() throws -> [String: PhotosDB.PostalAddress]
 }
 
 struct PhotosDB: PhotosDBProtocol {
   private let dbQueue: DatabaseQueue
   private let logger: ClassLogger
+
+  public enum Error: Swift.Error {
+    case connectionFailed(String)
+    case invalidGeoDataForAsset(String)
+  }
+
+  public struct PostalAddress: Sendable, Equatable {
+    let street: String
+    let subLocality: String
+    let city: String
+    let subAdministrativeArea: String
+    let state: String
+    let postalCode: String
+    let country: String
+    let isoCountryCode: String
+  }
 
   init(
     photosDBPath: String,
@@ -40,7 +56,7 @@ struct PhotosDB: PhotosDBProtocol {
       self.logger.debug("Connected to copy of Photos DB")
     } catch {
       self.logger.critical("Failed to connect to copy of Photos DB")
-      throw PhotosDBError.connectionFailed("\(error)")
+      throw Error.connectionFailed("\(error)")
     }
   }
 
@@ -95,7 +111,7 @@ struct PhotosDB: PhotosDBProtocol {
               "Location data for Asset invalid",
               ["asset_id": "\(uuid)"]
             )
-            throw PhotosDBError.invalidGeoDataForAsset(uuid)
+            throw Error.invalidGeoDataForAsset(uuid)
           }
 
           locationById[uuid] = postalAddress
@@ -132,22 +148,6 @@ struct PhotosDB: PhotosDBProtocol {
       isoCountryCode: pa.isoCountryCode
     )
   }
-}
-
-enum PhotosDBError: Error {
-  case connectionFailed(String)
-  case invalidGeoDataForAsset(String)
-}
-
-struct PostalAddress: Sendable, Equatable {
-  let street: String
-  let subLocality: String
-  let city: String
-  let subAdministrativeArea: String
-  let state: String
-  let postalCode: String
-  let country: String
-  let isoCountryCode: String
 }
 
 /*
