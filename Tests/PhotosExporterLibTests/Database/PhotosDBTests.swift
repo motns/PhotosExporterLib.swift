@@ -31,7 +31,7 @@ final class PhotosDBTests {
 
     if let url = Bundle.module.url(forResource: "TestDB", withExtension: "sqlite") {
       self.photosDB = try PhotosDB(
-        photosDBPath: url.absoluteString,
+        photosDBPath: url,
         logger: logger
       )
     } else {

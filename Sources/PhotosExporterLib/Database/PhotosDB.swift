@@ -45,7 +45,7 @@ struct PhotosDB: PhotosDBProtocol {
   }
 
   init(
-    photosDBPath: String,
+    photosDBPath: URL,
     logger: Logger
   ) throws {
     self.logger = ClassLogger(className: "PhotosDB", logger: logger)

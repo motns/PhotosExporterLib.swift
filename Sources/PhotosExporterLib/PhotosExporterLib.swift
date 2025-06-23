@@ -53,7 +53,7 @@ public struct PhotosExporterLib {
   }
 
   internal init(
-    exportBaseDir: String,
+    exportBaseDir: URL,
     photokit: PhotokitProtocol,
     exporterDB: ExporterDB,
     photosDB: PhotosDBProtocol,
@@ -63,17 +63,17 @@ public struct PhotosExporterLib {
     expiryDays: Int = 30,
     scoreThreshold: Int64 = 850000000,
   ) {
-    self.exportBaseDirURL = URL(filePath: exportBaseDir)
+    self.exportBaseDir = exportBaseDir
     self.photokit = photokit
     self.exporterDB = exporterDB
     self.fileManager = fileManager
     self.logger = ClassLogger(logger: logger, className: "PhotosExporterLib")
     self.timeProvider = timeProvider
 
-    let albumsDirURL = exportBaseDirURL.appending(path: "albums")
-    let filesDirURL = exportBaseDirURL.appending(path: "files")
-    let locationsDirURL = exportBaseDirURL.appending(path: "locations")
-    let topShotsDirURL = exportBaseDirURL.appending(path: "top-shots")
+    let albumsDirURL = exportBaseDir.appending(path: "albums")
+    let filesDirURL = exportBaseDir.appending(path: "files")
+    let locationsDirURL = exportBaseDir.appending(path: "locations")
+    let topShotsDirURL = exportBaseDir.appending(path: "top-shots")
 
     self.assetExporter = AssetExporter(
       exporterDB: exporterDB,
@@ -123,7 +123,7 @@ public struct PhotosExporterLib {
 
     do {
       classLogger.info("Creating export folder...")
-      if try ExporterFileManager.shared.createDirectory(path: exportBaseDir) == .exists {
+      if try ExporterFileManager.shared.createDirectory(url: exportBaseDir) == .exists {
         classLogger.trace("Export folder already exists")
       } else {
         classLogger.trace("Export folder created")
@@ -151,7 +151,7 @@ public struct PhotosExporterLib {
     )
   }
 
-  private static func copyPhotosDB(exportBaseDir: String, logger: ClassLogger) throws {
+  private static func copyPhotosDB(exportBaseDir: URL, logger: ClassLogger) throws {
     guard let picturesDirURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first else {
       throw Error.picturesDirectoryNotFound
     }
@@ -169,10 +169,9 @@ public struct PhotosExporterLib {
     ]
 
     logger.debug("Making a copy of Photos SQLite DB...")
-    let exportBaseDirURL = URL(filePath: exportBaseDir)
     for (dbFile, isRequired) in dbFilesToCopy {
       let src = photosLibraryDatabaseDirURL.appending(path: dbFile)
-      let dest = exportBaseDirURL.appending(path: dbFile)
+      let dest = exportBaseDir.appending(path: dbFile)
 
       if !FileManager.default.fileExists(atPath: src.path(percentEncoded: false)) {
         if isRequired {

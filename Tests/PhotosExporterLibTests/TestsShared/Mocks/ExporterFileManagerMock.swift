@@ -18,10 +18,12 @@ import Foundation
 @testable import PhotosExporterLib
 
 class ExporterFileManagerMock: ExporterFileManagerProtocol {
+  var pathExistsResult: ExporterFileManager.PathExistsResult
   public private(set) var createSymlinkCalls: [CreateSymlinkCall]
   public private(set) var removeCalls: [RemoveCall]
 
   init() {
+    pathExistsResult = .notexists
     createSymlinkCalls = [CreateSymlinkCall]()
     removeCalls = [RemoveCall]()
   }
@@ -31,20 +33,28 @@ class ExporterFileManagerMock: ExporterFileManagerProtocol {
     removeCalls = []
   }
 
-  func createDirectory(url: URL) throws -> ExporterFileManager.Result {
+  func pathExists(url: URL) -> ExporterFileManager.PathExistsResult {
+    return pathExistsResult
+  }
+
+  func pathExists(path: String) -> ExporterFileManager.PathExistsResult {
+    return pathExistsResult
+  }
+
+  func createDirectory(url: URL) throws -> ExporterFileManager.CreateResult {
     return try ExporterFileManager.shared.createDirectory(url: url)
   }
 
-  func createDirectory(path: String) throws -> ExporterFileManager.Result {
+  func createDirectory(path: String) throws -> ExporterFileManager.CreateResult {
     return try ExporterFileManager.shared.createDirectory(path: path)
   }
 
-  func createSymlink(src: URL, dest: URL) throws -> ExporterFileManager.Result {
+  func createSymlink(src: URL, dest: URL) throws -> ExporterFileManager.CreateResult {
     createSymlinkCalls.append(CreateSymlinkCall(src: src, dest: dest))
     return .success
   }
 
-  func remove(url: URL) throws -> ExporterFileManager.Result {
+  func remove(url: URL) throws -> ExporterFileManager.CreateResult {
     removeCalls.append(RemoveCall(url: url))
     return try ExporterFileManager.shared.remove(url: url)
   }

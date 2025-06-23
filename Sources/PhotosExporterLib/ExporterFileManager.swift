@@ -17,10 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 
 protocol ExporterFileManagerProtocol {
-  func createDirectory(url: URL) throws -> ExporterFileManager.Result
-  func createDirectory(path: String) throws -> ExporterFileManager.Result
-  func createSymlink(src: URL, dest: URL) throws -> ExporterFileManager.Result
-  func remove(url: URL) throws -> ExporterFileManager.Result
+  func pathExists(url: URL) -> ExporterFileManager.PathExistsResult
+  func pathExists(path: String) -> ExporterFileManager.PathExistsResult
+  func createDirectory(url: URL) throws -> ExporterFileManager.CreateResult
+  func createDirectory(path: String) throws -> ExporterFileManager.CreateResult
+  func createSymlink(src: URL, dest: URL) throws -> ExporterFileManager.CreateResult
+  func remove(url: URL) throws -> ExporterFileManager.CreateResult
 }
 
 struct ExporterFileManager: ExporterFileManagerProtocol {
@@ -30,24 +32,41 @@ struct ExporterFileManager: ExporterFileManagerProtocol {
     case fileExistsAtDirectoryPath(String)
   }
 
-  enum Result {
+  enum CreateResult {
     case exists, notexists, success
   }
 
-  func createDirectory(url: URL) throws -> Result {
-    return try createDirectory(path: url.path(percentEncoded: false))
+  enum PathExistsResult {
+    case file, directory, notexists
   }
 
-  func createDirectory(path: String) throws -> Result {
+  func pathExists(url: URL) -> PathExistsResult {
+    return pathExists(path: url.path(percentEncoded: false))
+  }
+
+  func pathExists(path: String) -> PathExistsResult {
     var isDirectory: ObjCBool = false
     if FileManager.default.fileExists(
       atPath: path,
       isDirectory: &isDirectory
-    ) && !isDirectory.boolValue {
+    ) {
+      return isDirectory.boolValue ? .directory : .file
+    }
+
+    return .notexists
+  }
+
+  func createDirectory(url: URL) throws -> CreateResult {
+    return try createDirectory(path: url.path(percentEncoded: false))
+  }
+
+  func createDirectory(path: String) throws -> CreateResult {
+    let existsResult = pathExists(path: path)
+    if existsResult == .file {
       throw Error.fileExistsAtDirectoryPath(path)
     }
 
-    guard !FileManager.default.fileExists(atPath: path) else {
+    guard existsResult == .notexists else {
       return .exists
     }
 
@@ -59,7 +78,7 @@ struct ExporterFileManager: ExporterFileManagerProtocol {
     return .success
   }
 
-  func createSymlink(src: URL, dest: URL) throws -> Result {
+  func createSymlink(src: URL, dest: URL) throws -> CreateResult {
     guard !FileManager.default.fileExists(atPath: dest.path(percentEncoded: false)) else {
       return .exists
     }
@@ -67,7 +86,7 @@ struct ExporterFileManager: ExporterFileManagerProtocol {
     return .success
   }
 
-  func remove(url: URL) throws -> Result {
+  func remove(url: URL) throws -> CreateResult {
     guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else {
       return .notexists
     }

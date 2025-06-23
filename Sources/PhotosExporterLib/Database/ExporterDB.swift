@@ -47,14 +47,14 @@ struct ExporterDB {
   }
 
   init(
-    exportDBPath: String,
+    exportDBPath: URL,
     logger: Logger,
   ) throws {
     self.logger = ClassLogger(className: "ExporterDB", logger: logger)
 
     do {
       self.logger.debug("Connecting to Export DB...")
-      dbQueue = try DatabaseQueue(path: exportDBPath)
+      dbQueue = try DatabaseQueue(path: exportDBPath.path(percentEncoded: false))
       self.logger.debug("Connected to Export DB")
     } catch {
       self.logger.critical("Failed to connect to ExporterDB")

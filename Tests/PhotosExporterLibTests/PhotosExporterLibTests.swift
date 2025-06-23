@@ -29,7 +29,7 @@ final class PhotosExporterLibTests {
   var photokitMock: PhotokitMock
   var photosDBMock: PhotosDBMock
   let fileManagerMock: ExporterFileManagerMock
-  let testDir: String
+  let testDir: URL
   let timeProvider: TestTimeProvider
   let countryLookup: CachedLookupTable
   let cityLookup: CachedLookupTable
@@ -46,7 +46,7 @@ final class PhotosExporterLibTests {
     self.timeProvider = TestTimeProvider()
 
     self.exporterDB = try ExporterDB(
-      exportDBPath: testDir + "/testdb.sqlite",
+      exportDBPath: testDir.appending(path: "testdb.sqlite"),
       logger: logger,
     )
     self.dataGen = TestDataGenerator(exporterDB: exporterDB)
@@ -65,8 +65,8 @@ final class PhotosExporterLibTests {
   }
 
   deinit {
-    if FileManager.default.fileExists(atPath: testDir) {
-      try? FileManager.default.removeItem(atPath: testDir)
+    if FileManager.default.fileExists(atPath: testDir.path(percentEncoded: false)) {
+      try? FileManager.default.removeItem(atPath: testDir.path(percentEncoded: false))
     }
   }
 
@@ -75,7 +75,7 @@ final class PhotosExporterLibTests {
   func exportIntoEmptyDB() async throws {
     // - MARK: Set up test data
     let startTime = timeProvider.freezeTime().getDate()
-    let exportBaseDirURL = URL(filePath: testDir)
+    let exportBaseDir = testDir
 
     let resource1 = dataGen.createPhotokitAssetResource()
     let resource2 = dataGen.createPhotokitAssetResource()
@@ -270,7 +270,7 @@ final class PhotosExporterLibTests {
       "\(initialRes.diff(expectedInitialRes).prettyDescription)"
     )
 
-    let fileDirURL = exportBaseDirURL.appending(path: "files")
+    let fileDirURL = exportBaseDir.appending(path: "files")
     let expectedCopyCalls = [
       CopyResourceCall(
         assetId: asset1.id,
@@ -307,9 +307,9 @@ final class PhotosExporterLibTests {
       "\(Diff.getDiff(sortedMockCopyCalls, expectedCopyCalls).prettyDescription)"
     )
 
-    let albumDirURL = exportBaseDirURL.appending(path: "albums")
-    let locationDirURL = exportBaseDirURL.appending(path: "locations")
-    let topshotsDirURL = exportBaseDirURL.appending(path: "top-shots")
+    let albumDirURL = exportBaseDir.appending(path: "albums")
+    let locationDirURL = exportBaseDir.appending(path: "locations")
+    let topshotsDirURL = exportBaseDir.appending(path: "top-shots")
     let expectedSymlinkCalls = [
       // Album symlinks
       CreateSymlinkCall(
@@ -592,7 +592,7 @@ final class PhotosExporterLibTests {
   // swiftlint:disable:next function_body_length
   func expireAndDeleteAssetsAndFiles() async throws {
     let now = timeProvider.setTime(timeStr: "2025-04-05 12:05:30").getDate()
-    let exportBaseDirURL = URL(filePath: testDir)
+    let exportBaseDir = testDir
 
     // These will stay as-is
     let resource1 = dataGen.createPhotokitAssetResource()
@@ -975,7 +975,7 @@ final class PhotosExporterLibTests {
       "\(historyEntryInDBDelete?.diff(expectedHistoryEntryDelete).prettyDescription ?? "empty")",
     )
 
-    let fileDirURL = exportBaseDirURL.appending(path: "files")
+    let fileDirURL = exportBaseDir.appending(path: "files")
     let expectedRemoveCalls = [
       RemoveCall(
         url: fileDirURL

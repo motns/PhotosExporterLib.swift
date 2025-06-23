@@ -30,16 +30,16 @@ struct TestHelpers {
     return dateOpt
   }
 
-  static func createTestDir() throws -> String {
-    let testDir = "/tmp/" + UUID().uuidString
+  static func createTestDir() throws -> URL {
+    let testDir = URL(filePath: "/tmp").appending(path: UUID().uuidString)
 
     var isDirectory: ObjCBool = false
     if !(FileManager.default.fileExists(
-      atPath: testDir,
+      atPath: testDir.path(percentEncoded: false),
       isDirectory: &isDirectory
     ) && isDirectory.boolValue) {
       try FileManager.default.createDirectory(
-        atPath: testDir,
+        atPath: testDir.path(percentEncoded: false),
         withIntermediateDirectories: true,
         attributes: nil
       )

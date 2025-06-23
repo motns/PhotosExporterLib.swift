@@ -23,14 +23,14 @@ import Testing
 // swiftlint:disable file_length
 // swiftlint:disable:next type_body_length
 final class ExporterDBTests {
-  let testDir: String
+  let testDir: URL
   let exporterDB: ExporterDB
   let testTimeProvider: TestTimeProvider
   let dataGen: TestDataGenerator
 
   init() throws {
     self.testDir = try TestHelpers.createTestDir()
-    let dbPath = testDir + "/testdb.sqlite"
+    let dbPath = testDir.appending(path: "testdb.sqlite")
     var logger = Logger(label: "io.motns.testing")
     logger.logLevel = .critical
     self.testTimeProvider = TestTimeProvider()
@@ -42,8 +42,8 @@ final class ExporterDBTests {
   }
 
   deinit {
-    if FileManager.default.fileExists(atPath: testDir) {
-      try? FileManager.default.removeItem(atPath: testDir)
+    if FileManager.default.fileExists(atPath: testDir.path(percentEncoded: false)) {
+      try? FileManager.default.removeItem(atPath: testDir.path(percentEncoded: false))
     }
   }
 

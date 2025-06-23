@@ -29,7 +29,7 @@ import Testing
 final class PhotosExporterLibLiveTests {
   let photosExporterLib: PhotosExporterLib
   let exporterDB: ExporterDB
-  let testDir: String
+  let testDir: URL
   let timeProvider: TestTimeProvider
 
   init() async throws {
@@ -39,7 +39,7 @@ final class PhotosExporterLibLiveTests {
     self.timeProvider = TestTimeProvider()
 
     self.exporterDB = try ExporterDB(
-      exportDBPath: testDir + "/export.sqlite",
+      exportDBPath: testDir.appending(path: "export.sqlite"),
       logger: logger,
     )
 
@@ -50,8 +50,8 @@ final class PhotosExporterLibLiveTests {
   }
 
   deinit {
-    if FileManager.default.fileExists(atPath: testDir) {
-      try? FileManager.default.removeItem(atPath: testDir)
+    if FileManager.default.fileExists(atPath: testDir.path(percentEncoded: false)) {
+      try? FileManager.default.removeItem(atPath: testDir.path(percentEncoded: false))
     }
   }
 
