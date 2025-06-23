@@ -47,7 +47,7 @@ struct SymlinkCreator {
     self.fileManager = fileManager
     self.scoreThreshold = scoreThreshold
     self.timeProvider = timeProvider
-    self.logger = ClassLogger(logger: logger, className: "SymlinkCreator")
+    self.logger = ClassLogger(className: "SymlinkCreator", logger: logger)
   }
 
   func create(isEnabled: Bool = true) throws {

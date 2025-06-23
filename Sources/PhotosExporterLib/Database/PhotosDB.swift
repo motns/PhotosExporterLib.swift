@@ -48,11 +48,11 @@ struct PhotosDB: PhotosDBProtocol {
     photosDBPath: String,
     logger: Logger
   ) throws {
-    self.logger = ClassLogger(logger: logger, className: "PhotosDB")
+    self.logger = ClassLogger(className: "PhotosDB", logger: logger)
 
     do {
       self.logger.debug("Connecting to copy of Photos DB...")
-      dbQueue = try DatabaseQueue(path: photosDBPath)
+      dbQueue = try DatabaseQueue(path: photosDBPath.path(percentEncoded: false))
       self.logger.debug("Connected to copy of Photos DB")
     } catch {
       self.logger.critical("Failed to connect to copy of Photos DB")

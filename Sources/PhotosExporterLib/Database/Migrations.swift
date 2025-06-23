@@ -29,7 +29,7 @@ struct Migrations {
   ) throws {
     self.migrator = DatabaseMigrator()
     self.dbQueue = dbQueue
-    self.logger = ClassLogger(logger: logger, className: "Migrations")
+    self.logger = ClassLogger(className: "Migrations", logger: logger)
 
     LookupTablesMigration.register(&migrator)
     MainTablesInitialMigration.register(&migrator)

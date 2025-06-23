@@ -103,7 +103,7 @@ struct AssetExporter {
     self.photokit = photokit
     self.countryLookup = CachedLookupTable(table: .country, exporterDB: exporterDB, logger: logger)
     self.cityLookup = CachedLookupTable(table: .city, exporterDB: exporterDB, logger: logger)
-    self.logger = ClassLogger(logger: logger, className: "AssetExporter")
+    self.logger = ClassLogger(className: "AssetExporter", logger: logger)
     self.timeProvider = timeProvider
     self.expiryDays = expiryDays
   }

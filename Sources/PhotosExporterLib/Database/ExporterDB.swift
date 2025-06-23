@@ -50,7 +50,7 @@ struct ExporterDB {
     exportDBPath: String,
     logger: Logger,
   ) throws {
-    self.logger = ClassLogger(logger: logger, className: "ExporterDB")
+    self.logger = ClassLogger(className: "ExporterDB", logger: logger)
 
     do {
       self.logger.debug("Connecting to Export DB...")

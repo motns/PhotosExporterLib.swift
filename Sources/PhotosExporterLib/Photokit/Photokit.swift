@@ -59,8 +59,8 @@ struct Photokit: PhotokitProtocol {
 
   init(logger: Logger) async throws {
     self.logger = ClassLogger(
-      logger: logger,
       className: "Photokit",
+      logger: logger,
     )
 
     do {

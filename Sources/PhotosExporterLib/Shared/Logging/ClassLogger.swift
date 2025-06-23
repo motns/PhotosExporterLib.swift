@@ -18,22 +18,50 @@ import Foundation
 import Logging
 
 struct ClassLogger {
-  private let logger: Logger
+  public let logger: Logger
+  private let className: String
   private let globalMetadata: Logger.Metadata
 
   init(
-    logger: Logger,
     className: String,
+    logger: Logger? = nil,
     metadata: Logger.Metadata? = nil
   ) {
-    self.logger = logger
+    if let customLogger = logger {
+      self.logger = customLogger
+    } else {
+      var defaultLogger = Logger(label: "io.motns.PhotosExporter")
+      defaultLogger.logLevel = .info
+      self.logger = defaultLogger
+    }
 
+    self.className = className
     let classMetadata: Logger.Metadata = ["class": "\(className)"]
     self.globalMetadata = if let metadata {
       metadata.merging(classMetadata) { (_, new) in new }
     } else {
       classMetadata
     }
+  }
+
+  func withClassName(
+    className: String,
+  ) -> ClassLogger {
+    return ClassLogger(
+      className: className,
+      logger: self.logger,
+      metadata: self.globalMetadata, // "class" key will be overwritten by init()
+    )
+  }
+
+  func withMetadata(
+    metadata: Logger.Metadata,
+  ) -> ClassLogger {
+    return ClassLogger(
+      className: self.className,
+      logger: self.logger,
+      metadata: metadata,
+    )
   }
 
   private func logWithClassName(

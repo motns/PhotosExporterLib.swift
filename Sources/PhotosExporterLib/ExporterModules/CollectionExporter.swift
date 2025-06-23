@@ -69,7 +69,7 @@ struct CollectionExporter {
     self.exporterDB = exporterDB
     self.photokit = photokit
     self.timeProvider = timeProvider
-    self.logger = ClassLogger(logger: logger, className: "CollectionExporter")
+    self.logger = ClassLogger(className: "CollectionExporter", logger: logger)
   }
 
   func export(isEnabled: Bool = true) throws -> Result {

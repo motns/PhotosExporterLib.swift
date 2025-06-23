@@ -59,7 +59,7 @@ struct FileExporter {
     self.photokit = photokit
     self.fileManager = fileManager
     self.timeProvider = timeProvider
-    self.logger = ClassLogger(logger: logger, className: "FileCopier")
+    self.logger = ClassLogger(className: "FileCopier", logger: logger)
   }
 
   func run(isEnabled: Bool = false) async throws -> ResultWithRemoved {

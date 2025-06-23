@@ -31,8 +31,8 @@ final class CachedLookupTable {
     self.table = table
     self.exporterDB = exporterDB
     self.logger = ClassLogger(
-      logger: logger,
       className: "CachedLookupTable",
+      logger: logger,
       metadata: [
         "table": "\(table.rawValue)"
       ]

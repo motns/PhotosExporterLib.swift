@@ -118,18 +118,8 @@ public struct PhotosExporterLib {
     logger: Logger? = nil,
     expiryDays: Int = 30,
     scoreThreshold: Int64 = 850000000,
-  ) async throws -> PhotosExporterLib {
-    let loggerActual: Logger
-
-    if let customLogger = logger {
-      loggerActual = customLogger
-    } else {
-      var defaultLogger = Logger(label: "io.motns.PhotosExporter")
-      defaultLogger.logLevel = .info
-      loggerActual = defaultLogger
-    }
-
-    let classLogger = ClassLogger(logger: loggerActual, className: "PhotosExporterLib")
+  ) throws -> PhotosExporterLib {
+    let classLogger = ClassLogger(className: "PhotosExporterLib", logger: logger)
 
     do {
       classLogger.info("Creating export folder...")
