@@ -19,6 +19,8 @@ import Photos
 import Logging
 
 protocol PhotokitProtocol {
+  static func authorisePhotos(logger: Logger?) async throws
+
   func getAllAssetsResult() async throws -> any AssetFetchResultProtocol
 
   func getAssetIdsForAlbumId(albumId: String) throws -> [String]
@@ -57,26 +59,20 @@ struct Photokit: PhotokitProtocol {
     case copied, exists, removed
   }
 
-  init(logger: Logger) async throws {
+  init(logger: Logger) {
     self.logger = ClassLogger(
       className: "Photokit",
       logger: logger,
     )
-
-    do {
-      try await authorisePhotos()
-    } catch {
-      logger.critical("Failed to initialise PhotokitLib")
-      throw error
-    }
   }
 
-  private func authorisePhotos() async throws {
-    logger.debug("Checking access to Photos...")
+  static func authorisePhotos(logger: Logger? = nil) async throws {
+    let classLogger = ClassLogger(className: "", logger: logger)
+    classLogger.debug("Checking access to Photos...")
 
     switch PHPhotoLibrary.authorizationStatus(for: PHAccessLevel.readWrite) {
     case .authorized:
-      logger.debug("Already authorised :)")
+      classLogger.debug("Already authorised :)")
     case .limited:
       throw Error.authotisationError("App only has limited access - please grant full permission")
     case .restricted:
@@ -89,7 +85,7 @@ struct Photokit: PhotokitProtocol {
       // We haven't asked for access before
       switch await PHPhotoLibrary.requestAuthorization(for: PHAccessLevel.readWrite) {
       case .authorized:
-        logger.debug("Received authorisation :D")
+        classLogger.debug("Received authorisation :D")
         return
       case .limited, .restricted, .denied, .notDetermined:
         throw Error.authotisationError("You must grant full permission to the exporter")
@@ -301,7 +297,9 @@ struct Photokit: PhotokitProtocol {
     if let fileSize = resource.value(forKey: "fileSize") as? Int64, fileSize != 0 {
       return fileSize
     } else {
-      logger.warning(
+      // These seem more common than expected, so we'll downgrade to `debug`
+      // level from `warning`
+      logger.debug(
         "fileSize attribute missing or zero for Asset Resource - reading it from file contents...",
         loggerMetadata
       )

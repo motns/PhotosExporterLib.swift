@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 import Foundation
+import Logging
 @testable import PhotosExporterLib
 
 class PhotokitMock: PhotokitProtocol {
@@ -35,6 +36,10 @@ class PhotokitMock: PhotokitProtocol {
     self.rootFolders = []
     self.copyResourceCalls = []
     self.copyResourceResponse = .copied
+  }
+
+  static func authorisePhotos(logger: Logger? = nil) async throws {
+    return
   }
 
   func resetCalls() {

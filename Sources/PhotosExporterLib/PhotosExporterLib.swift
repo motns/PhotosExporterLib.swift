@@ -137,7 +137,7 @@ public struct PhotosExporterLib {
 
     return PhotosExporterLib(
       exportBaseDir: exportBaseDir,
-      photokit: try await Photokit(logger: loggerActual),
+      photokit: Photokit(logger: classLogger.logger),
       exporterDB: try ExporterDB(
         exportDBPath: "\(exportBaseDir)/export.sqlite",
         logger: loggerActual,
@@ -195,6 +195,10 @@ public struct PhotosExporterLib {
         ])
       }
     }
+  }
+
+  public static func authorisePhotos() async throws {
+    try await Photokit.authorisePhotos()
   }
 
   public func lastRun() throws -> HistoryEntry? {
