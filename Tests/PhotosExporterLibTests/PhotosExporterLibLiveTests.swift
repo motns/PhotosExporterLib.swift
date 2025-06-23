@@ -43,7 +43,9 @@ final class PhotosExporterLibLiveTests {
       logger: logger,
     )
 
-    self.photosExporterLib = try await PhotosExporterLib.create(
+    try await PhotosExporterLib.authorisePhotos()
+
+    self.photosExporterLib = try PhotosExporterLib.create(
       exportBaseDir: testDir,
       logger: logger,
     )
@@ -58,7 +60,7 @@ final class PhotosExporterLibLiveTests {
   @Test("Export")
   func export() async throws {
     let expectedInitialRes = PhotosExporterLib.Result(
-      assetExport: AssetExporter.Result(
+      assetExport: AssetExporterResult(
         assetInserted: 8,
         assetUpdated: 0,
         assetUnchanged: 0,
@@ -72,15 +74,17 @@ final class PhotosExporterLibLiveTests {
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
       ),
-      collectionExport: CollectionExporter.Result(
+      collectionExport: CollectionExporterResult(
         folderInserted: 1,
         folderUpdated: 0,
         folderUnchanged: 0,
+        folderDeleted: 0,
         albumInserted: 0,
         albumUpdated: 0,
-        albumUnchanged: 0
+        albumUnchanged: 0,
+        albumDeleted: 0,
       ),
-      fileExport: FileExporter.Result(copied: 8, deleted: 0)
+      fileExport: FileExporterResult(copied: 8, deleted: 0)
     )
 
     let initialRes = try await photosExporterLib.export()

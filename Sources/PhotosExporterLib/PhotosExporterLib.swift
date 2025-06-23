@@ -18,8 +18,11 @@ import Foundation
 import Photos
 import Logging
 
+// swiftlint:disable:next type_body_length
 public struct PhotosExporterLib {
-  private let exportBaseDirURL: URL
+  public let exportBaseDir: URL
+  public let runStatus: Status
+
   private let photokit: PhotokitProtocol
   private let exporterDB: ExporterDB
   private let fileManager: ExporterFileManagerProtocol
@@ -32,15 +35,15 @@ public struct PhotosExporterLib {
   private let symlinkCreator: SymlinkCreator
 
   public struct Result: Codable, Sendable, Equatable {
-    let assetExport: AssetExporter.Result
-    let collectionExport: CollectionExporter.Result
-    let fileExport: FileExporter.Result
+    public let assetExport: AssetExporterResult
+    public let collectionExport: CollectionExporterResult
+    public let fileExport: FileExporterResult
 
-    static func empty() -> Result {
+    public static func empty() -> Result {
       return Result(
-        assetExport: AssetExporter.Result.empty(),
-        collectionExport: CollectionExporter.Result.empty(),
-        fileExport: FileExporter.Result.empty()
+        assetExport: AssetExporterResult.empty(),
+        collectionExport: CollectionExporterResult.empty(),
+        fileExport: FileExporterResult.empty()
       )
     }
   }
@@ -50,6 +53,93 @@ public struct PhotosExporterLib {
     case photosLibraryNotFound(String)
     case missingPhotosDBFile(String)
     case unexpectedError(String)
+  }
+
+  public enum RunState: Equatable {
+    case notStarted, skipped, running
+    case complete(Double)
+    case failed(String)
+  }
+
+  @Observable
+  public class RunStatus {
+    public var currentState: RunState {
+      currentStateInternal
+    }
+    internal var currentStateInternal: RunState
+
+    public init() {
+      self.currentStateInternal = .notStarted
+    }
+
+    internal func start() {
+      self.currentStateInternal = .running
+    }
+
+    internal func skipped() {
+      self.currentStateInternal = .skipped
+    }
+
+    internal func complete(runTime: Double) {
+      self.currentStateInternal = .complete(runTime)
+    }
+
+    internal func failed(error: String) {
+      self.currentStateInternal = .failed(error)
+    }
+  }
+
+  @Observable
+  public class RunStatusWithProgress: RunStatus {
+    public private(set) var progress: Double = 0
+    private var toProcess: Int = 0
+    private var processed: Int = 0
+
+    internal func startProgress(toProcess: Int) {
+      self.toProcess = toProcess
+    }
+
+    override internal func complete(runTime: Double) {
+      self.progress = 1
+      super.complete(runTime: runTime)
+    }
+
+    override internal func failed(error: String) {
+      reset()
+      super.failed(error: error)
+    }
+
+    func reset() {
+      self.progress = 0
+      self.processed = 0
+      self.toProcess = 0
+    }
+
+    func processed(count: Int = 1) {
+      self.processed += count
+      self.progress = Double(processed) / Double(toProcess)
+    }
+  }
+
+  @Observable
+  public class Status: RunStatus {
+    public let assetExporterStatus: AssetExporterStatus
+    public let collectionExporterStatus: CollectionExporterStatus
+    public let fileExporterStatus: FileExporterStatus
+    public let symlinkCreatorStatus: SymlinkCreatorStatus
+
+    public init(
+      assetExporterStatus: AssetExporterStatus,
+      collectionExporterStatus: CollectionExporterStatus,
+      fileExporterStatus: FileExporterStatus,
+      symlinkCreatorStatus: SymlinkCreatorStatus,
+    ) {
+      self.assetExporterStatus = assetExporterStatus
+      self.collectionExporterStatus = collectionExporterStatus
+      self.fileExporterStatus = fileExporterStatus
+      self.symlinkCreatorStatus = symlinkCreatorStatus
+      super.init()
+    }
   }
 
   internal init(
@@ -67,7 +157,7 @@ public struct PhotosExporterLib {
     self.photokit = photokit
     self.exporterDB = exporterDB
     self.fileManager = fileManager
-    self.logger = ClassLogger(logger: logger, className: "PhotosExporterLib")
+    self.logger = ClassLogger(className: "PhotosExporterLib", logger: logger)
     self.timeProvider = timeProvider
 
     let albumsDirURL = exportBaseDir.appending(path: "albums")
@@ -111,10 +201,17 @@ public struct PhotosExporterLib {
       timeProvider: timeProvider,
       logger: logger,
     )
+
+    self.runStatus = Status(
+      assetExporterStatus: self.assetExporter.runStatus,
+      collectionExporterStatus: self.collectionExporter.runStatus,
+      fileExporterStatus: self.fileExporter.runStatus,
+      symlinkCreatorStatus: self.symlinkCreator.runStatus,
+    )
   }
 
   public static func create(
-    exportBaseDir: String,
+    exportBaseDir: URL,
     logger: Logger? = nil,
     expiryDays: Int = 30,
     scoreThreshold: Int64 = 850000000,
@@ -139,12 +236,15 @@ public struct PhotosExporterLib {
       exportBaseDir: exportBaseDir,
       photokit: Photokit(logger: classLogger.logger),
       exporterDB: try ExporterDB(
-        exportDBPath: "\(exportBaseDir)/export.sqlite",
-        logger: loggerActual,
+        exportDBPath: exportBaseDir.appending(path: "export.sqlite"),
+        logger: classLogger.logger,
       ),
-      photosDB: try PhotosDB(photosDBPath: "\(exportBaseDir)/Photos.sqlite", logger: loggerActual),
+      photosDB: try PhotosDB(
+        photosDBPath: exportBaseDir.appending(path: "Photos.sqlite"),
+        logger: classLogger.logger,
+      ),
       fileManager: ExporterFileManager.shared,
-      logger: loggerActual,
+      logger: classLogger.logger,
       timeProvider: DefaultTimeProvider.shared,
       expiryDays: expiryDays,
       scoreThreshold: scoreThreshold,
@@ -205,51 +305,64 @@ public struct PhotosExporterLib {
     return try exporterDB.getLatestExportResultHistoryEntry()?.toPublicEntry()
   }
 
+  public func exportHistory() throws -> [HistoryEntry] {
+    return try exporterDB.getExportResultHistoryEntries(limit: 100, offset: 0).map { historyEntry in
+      historyEntry.toPublicEntry()
+    }
+  }
+
   public func export(
     assetExportEnabled: Bool = true,
     collectionExportEnabled: Bool = true,
     fileManagerEnabled: Bool = true,
     symlinkCreatorEnabled: Bool = true,
   ) async throws -> Result {
-    logger.info("Running Export...")
-    let startDate = timeProvider.getDate()
+    do {
+      logger.info("Running Export...")
+      runStatus.start()
+      let startDate = timeProvider.getDate()
 
-    let exportAssetResult = try await assetExporter.export(isEnabled: assetExportEnabled)
-    let albumExportResult = try collectionExporter.export(isEnabled: collectionExportEnabled)
-    let fileManagerResult = try await fileExporter.run(isEnabled: fileManagerEnabled)
-    try symlinkCreator.create(isEnabled: symlinkCreatorEnabled)
+      let exportAssetResult = try await assetExporter.export(isEnabled: assetExportEnabled)
+      let albumExportResult = try collectionExporter.export(isEnabled: collectionExportEnabled)
+      let fileManagerResult = try await fileExporter.run(isEnabled: fileManagerEnabled)
+      try symlinkCreator.create(isEnabled: symlinkCreatorEnabled)
 
-    let exportResult = Result(
-      assetExport: exportAssetResult.copy(
-        fileMarkedForDeletion: exportAssetResult.fileMarkedForDeletion + fileManagerResult.fileMarkedForDeletion
-      ),
-      collectionExport: albumExportResult,
-      fileExport: fileManagerResult.result,
-    )
+      let exportResult = Result(
+        assetExport: exportAssetResult.copy(
+          fileMarkedForDeletion: exportAssetResult.fileMarkedForDeletion + fileManagerResult.fileMarkedForDeletion
+        ),
+        collectionExport: albumExportResult,
+        fileExport: fileManagerResult.result,
+      )
 
-    logger.debug("Writing Export Result History entry to DB...")
-    let assetCount = try exporterDB.countAssets()
-    let fileCount = try exporterDB.countFiles()
-    let albumCount = try exporterDB.countAlbums()
-    let folderCount = try exporterDB.countFolders()
-    let fileSizeTotal = try exporterDB.sumFileSizes()
+      logger.debug("Writing Export Result History entry to DB...")
+      let assetCount = try exporterDB.countAssets()
+      let fileCount = try exporterDB.countFiles()
+      let albumCount = try exporterDB.countAlbums()
+      let folderCount = try exporterDB.countFolders()
+      let fileSizeTotal = try exporterDB.sumFileSizes()
 
-    let runTime = timeProvider.secondsPassedSince(startDate)
-    let historyEntry = ExportResultHistoryEntry(
-      id: UUID().uuidString,
-      createdAt: timeProvider.getDate(),
-      exportResult: exportResult,
-      assetCount: assetCount,
-      fileCount: fileCount,
-      albumCount: albumCount,
-      folderCount: folderCount,
-      fileSizeTotal: fileSizeTotal ?? 0,
-      runTime: Decimal(runTime),
-    )
-    _ = try exporterDB.insertExportResultHistoryEntry(entry: historyEntry)
+      let runTime = timeProvider.secondsPassedSince(startDate)
+      let historyEntry = ExportResultHistoryEntry(
+        id: UUID().uuidString,
+        createdAt: timeProvider.getDate(),
+        exportResult: exportResult,
+        assetCount: assetCount,
+        fileCount: fileCount,
+        albumCount: albumCount,
+        folderCount: folderCount,
+        fileSizeTotal: fileSizeTotal ?? 0,
+        runTime: Decimal(runTime),
+      )
+      _ = try exporterDB.insertExportResultHistoryEntry(entry: historyEntry)
 
-    logger.info("Export complete in \(runTime)s")
-    return exportResult
+      logger.info("Export complete in \(runTime)s")
+      runStatus.complete(runTime: runTime)
+      return exportResult
+    } catch {
+      runStatus.failed(error: "\(error)")
+      throw Error.unexpectedError("\(error)")
+    }
   }
 }
 

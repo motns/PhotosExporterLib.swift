@@ -18,6 +18,8 @@ import Foundation
 import Logging
 
 struct SymlinkCreator {
+  public let runStatus: SymlinkCreatorStatus
+
   private let albumsDirURL: URL
   private let filesDirURL: URL
   private let locationsDirURL: URL
@@ -27,6 +29,10 @@ struct SymlinkCreator {
   private let scoreThreshold: Int64
   private let timeProvider: TimeProvider
   private let logger: ClassLogger
+
+  public enum Error: Swift.Error {
+    case unexpectedError(String)
+  }
 
   init(
     albumsDirURL: URL,
@@ -39,6 +45,7 @@ struct SymlinkCreator {
     timeProvider: TimeProvider,
     logger: Logger,
   ) {
+    self.runStatus = SymlinkCreatorStatus()
     self.albumsDirURL = albumsDirURL
     self.filesDirURL = filesDirURL
     self.locationsDirURL = locationsDirURL
@@ -53,28 +60,37 @@ struct SymlinkCreator {
   func create(isEnabled: Bool = true) throws {
     guard isEnabled else {
       logger.warning("Symlink creator disabled - skipping")
+      runStatus.skipped()
       return
     }
 
-    logger.info("Removing and recreating symlink folders...")
-    let startDate = timeProvider.getDate()
+    do {
+      logger.info("Removing and recreating symlink folders...")
+      runStatus.start()
+      let startDate = timeProvider.getDate()
 
-    _ = try fileManager.remove(url: albumsDirURL)
-    _ = try fileManager.createDirectory(url: albumsDirURL)
+      _ = try fileManager.remove(url: albumsDirURL)
+      _ = try fileManager.createDirectory(url: albumsDirURL)
 
-    logger.debug("Creating Album directories and symlinks...")
-    try createAlbumFolderSymlinks(
-      folderId: Photokit.RootFolderId,
-      folderDirURL: albumsDirURL,
-    )
+      logger.debug("Creating Album directories and symlinks...")
+      try createAlbumFolderSymlinks(
+        folderId: Photokit.RootFolderId,
+        folderDirURL: albumsDirURL,
+      )
 
-    logger.debug("Creating location symlinks...")
-    try createLocationSymlinks()
+      logger.debug("Creating location symlinks...")
+      try createLocationSymlinks()
 
-    logger.debug("Creating top shot symlinks...")
-    try createTopShotsSymlinks()
+      logger.debug("Creating top shot symlinks...")
+      try createTopShotsSymlinks()
 
-    logger.info("Symlink folders created in \(timeProvider.secondsPassedSince(startDate))s")
+      let runTime = timeProvider.secondsPassedSince(startDate)
+      logger.info("Symlink folders created in \(runTime)s")
+      runStatus.complete(runTime: runTime)
+    } catch {
+      runStatus.failed(error: "\(error)")
+      throw Error.unexpectedError("\(error)")
+    }
   }
 
   private func createAlbumFolderSymlinks(folderId: String, folderDirURL: URL) throws {
@@ -245,3 +261,8 @@ struct SymlinkCreator {
     }
   }
 }
+
+// We can't make this a nested type, because then we would have to
+// make `SymlinkCreator` public
+@Observable
+public class SymlinkCreatorStatus: PhotosExporterLib.RunStatus {}

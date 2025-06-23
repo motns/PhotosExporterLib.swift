@@ -446,7 +446,7 @@ struct TestDataGenerator {
 
   func createExportResult() -> PhotosExporterLib.Result {
     return PhotosExporterLib.Result(
-      assetExport: AssetExporter.Result(
+      assetExport: AssetExporterResult(
         assetInserted: Int.random(in: 0...9999),
         assetUpdated: Int.random(in: 0...9999),
         assetUnchanged: Int.random(in: 0...9999),
@@ -460,15 +460,17 @@ struct TestDataGenerator {
         fileMarkedForDeletion: Int.random(in: 0...9999),
         fileDeleted: Int.random(in: 0...9999),
       ),
-      collectionExport: CollectionExporter.Result(
+      collectionExport: CollectionExporterResult(
         folderInserted: Int.random(in: 0...9999),
         folderUpdated: Int.random(in: 0...9999),
         folderUnchanged: Int.random(in: 0...9999),
+        folderDeleted: Int.random(in: 0...9999),
         albumInserted: Int.random(in: 0...9999),
         albumUpdated: Int.random(in: 0...9999),
         albumUnchanged: Int.random(in: 0...9999),
+        albumDeleted: Int.random(in: 0...9999),
       ),
-      fileExport: FileExporter.Result(
+      fileExport: FileExporterResult(
         copied: Int.random(in: 0...9999),
         deleted: Int.random(in: 0...9999),
       )

@@ -17,8 +17,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import Logging
 
+// swiftlint:disable file_length
 // swiftlint:disable:next type_body_length
 struct AssetExporter {
+  public let runStatus: AssetExporterStatus
+
   private var exporterDB: ExporterDB
   private var photosDB: PhotosDBProtocol
   private let countryLookup: CachedLookupTable
@@ -28,66 +31,8 @@ struct AssetExporter {
   private var timeProvider: TimeProvider
   private let expiryDays: Int
 
-  public struct Result: Codable, Sendable {
-    let assetInserted: Int
-    let assetUpdated: Int
-    let assetUnchanged: Int
-    let assetSkipped: Int
-    let assetMarkedForDeletion: Int
-    let assetDeleted: Int
-    let fileInserted: Int
-    let fileUpdated: Int
-    let fileUnchanged: Int
-    let fileSkipped: Int
-    let fileMarkedForDeletion: Int
-    let fileDeleted: Int
-
-    static func empty() -> Result {
-      return Result(
-        assetInserted: 0,
-        assetUpdated: 0,
-        assetUnchanged: 0,
-        assetSkipped: 0,
-        assetMarkedForDeletion: 0,
-        assetDeleted: 0,
-        fileInserted: 0,
-        fileUpdated: 0,
-        fileUnchanged: 0,
-        fileSkipped: 0,
-        fileMarkedForDeletion: 0,
-        fileDeleted: 0,
-      )
-    }
-
-    func copy(
-      assetInserted: Int? = nil,
-      assetUpdated: Int? = nil,
-      assetUnchanged: Int? = nil,
-      assetSkipped: Int? = nil,
-      assetMarkedForDeletion: Int? = nil,
-      assetDeleted: Int? = nil,
-      fileInserted: Int? = nil,
-      fileUpdated: Int? = nil,
-      fileUnchanged: Int? = nil,
-      fileSkipped: Int? = nil,
-      fileMarkedForDeletion: Int? = nil,
-      fileDeleted: Int? = nil,
-    ) -> Result {
-      return Result(
-        assetInserted: assetInserted ?? self.assetInserted,
-        assetUpdated: assetUpdated ?? self.assetUpdated,
-        assetUnchanged: assetUnchanged ?? self.assetUnchanged,
-        assetSkipped: assetSkipped ?? self.assetSkipped,
-        assetMarkedForDeletion: assetMarkedForDeletion ?? self.assetMarkedForDeletion,
-        assetDeleted: assetDeleted ?? self.assetDeleted,
-        fileInserted: fileInserted ?? self.fileInserted,
-        fileUpdated: fileUpdated ?? self.fileUpdated,
-        fileUnchanged: fileUnchanged ?? self.fileUnchanged,
-        fileSkipped: fileSkipped ?? self.fileSkipped,
-        fileMarkedForDeletion: fileMarkedForDeletion ?? self.fileMarkedForDeletion,
-        fileDeleted: fileDeleted ?? self.fileDeleted,
-      )
-    }
+  public enum Error: Swift.Error {
+    case unexpectedError(String)
   }
 
   init(
@@ -98,6 +43,7 @@ struct AssetExporter {
     timeProvider: TimeProvider,
     expiryDays: Int = 30,
   ) {
+    self.runStatus = AssetExporterStatus()
     self.exporterDB = exporterDB
     self.photosDB = photosDB
     self.photokit = photokit
@@ -108,74 +54,97 @@ struct AssetExporter {
     self.expiryDays = expiryDays
   }
 
-  func export(isEnabled: Bool = true) async throws -> Result {
+  func export(isEnabled: Bool = true) async throws -> AssetExporterResult {
     guard isEnabled else {
       logger.warning("Asset export disabled - skipping")
-      return Result.empty()
+      runStatus.skipped()
+      return AssetExporterResult.empty()
     }
-    let startDate = timeProvider.getDate()
-    let assetExportResult = try await exportAssets()
-    let (assetMarkedCnt, fileMarkedCnt) = try await markDeletedAssetsAndFiles()
-    let (assetDeletedCnt, fileDeletedCnt) = try removeExpiredAssetsAndFiles()
-    logger.info("Asset export complete in \(timeProvider.secondsPassedSince(startDate))s")
-    return assetExportResult.copy(
-      assetMarkedForDeletion: assetMarkedCnt,
-      assetDeleted: assetDeletedCnt,
-      fileMarkedForDeletion: fileMarkedCnt,
-      fileDeleted: fileDeletedCnt,
-    )
+
+    do {
+      runStatus.start()
+      let startDate = timeProvider.getDate()
+      let assetExportResult = try await exportAssets()
+      let (assetMarkedCnt, fileMarkedCnt) = try await markDeletedAssetsAndFiles()
+      let (assetDeletedCnt, fileDeletedCnt) = try removeExpiredAssetsAndFiles()
+
+      let runTime = timeProvider.secondsPassedSince(startDate)
+      logger.info("Asset export complete in \(runTime)s")
+      runStatus.complete(runTime: runTime)
+      return assetExportResult.copy(
+        assetMarkedForDeletion: assetMarkedCnt,
+        assetDeleted: assetDeletedCnt,
+        fileMarkedForDeletion: fileMarkedCnt,
+        fileDeleted: fileDeletedCnt,
+      )
+    } catch {
+      runStatus.failed(error: "\(error)")
+      throw Error.unexpectedError("\(error)")
+    }
   }
 
-  private func exportAssets() async throws -> Result {
-    logger.info("Exporting Assets to local DB...")
+  // swiftlint:disable:next function_body_length
+  private func exportAssets() async throws -> AssetExporterResult {
+    do {
+      logger.info("Exporting Assets to local DB...")
+      let startTime = timeProvider.getDate()
+      runStatus.exportAssetStatus.start()
 
-    let assetLocationById = try photosDB.getAllAssetLocationsById()
-    let assetScoreById = try photosDB.getAllAssetScoresById()
-    let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
-    var assetResults = [ExporterDB.UpsertResult?]()
-    var fileResults = [ExporterDB.UpsertResult?]()
+      let assetLocationById = try photosDB.getAllAssetLocationsById()
+      let assetScoreById = try photosDB.getAllAssetScoresById()
+      let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
+      var assetResults = [ExporterDB.UpsertResult?]()
+      var fileResults = [ExporterDB.UpsertResult?]()
 
-    while let photokitAsset = try await allPhotokitAssetsResult.next() {
-      let assetLocation = assetLocationById[photokitAsset.uuid]
+      runStatus.exportAssetStatus.startProgress(toProcess: allPhotokitAssetsResult.count)
 
-      let (country, countryId): (String?, Int64?) = switch assetLocation?.country {
-      case .none: (nil, nil)
-      case .some(let country): (country, try countryLookup.getIdByName(name: country))
-      }
+      while let photokitAsset = try await allPhotokitAssetsResult.next() {
+        let assetLocation = assetLocationById[photokitAsset.uuid]
 
-      let (city, cityId): (String?, Int64?) = switch assetLocation?.city {
-      case .none: (nil, nil)
-      case .some(let city): (city, try cityLookup.getIdByName(name: city))
-      }
+        let (country, countryId): (String?, Int64?) = switch assetLocation?.country {
+        case .none: (nil, nil)
+        case .some(let country): (country, try countryLookup.getIdByName(name: country))
+        }
 
-      let exportedAssetOpt = ExportedAsset.fromPhotokitAsset(
-        asset: photokitAsset,
-        aestheticScore: assetScoreById[photokitAsset.uuid] ?? 0,
-        now: self.timeProvider.getDate()
-      )
-      guard let exportedAsset = exportedAssetOpt else {
-        logger.warning(
-          "Could not convert Photokit Asset to Exported Asset",
-          ["asset_id": "\(photokitAsset.id)"]
-        )
-        assetResults.append(nil)
-        continue
-      }
-      assetResults.append(try exporterDB.upsertAsset(asset: exportedAsset, now: timeProvider.getDate()))
+        let (city, cityId): (String?, Int64?) = switch assetLocation?.city {
+        case .none: (nil, nil)
+        case .some(let city): (city, try cityLookup.getIdByName(name: city))
+        }
 
-      for photokitResource in photokitAsset.resources {
-        fileResults.append(try processResource(
+        let exportedAssetOpt = ExportedAsset.fromPhotokitAsset(
           asset: photokitAsset,
-          resource: photokitResource,
-          countryId: countryId,
-          cityId: cityId,
-          country: country,
-          city: city,
-        ))
-      }
-    }
+          aestheticScore: assetScoreById[photokitAsset.uuid] ?? 0,
+          now: self.timeProvider.getDate()
+        )
+        guard let exportedAsset = exportedAssetOpt else {
+          logger.warning(
+            "Could not convert Photokit Asset to Exported Asset",
+            ["asset_id": "\(photokitAsset.id)"]
+          )
+          assetResults.append(nil)
+          continue
+        }
+        assetResults.append(try exporterDB.upsertAsset(asset: exportedAsset, now: timeProvider.getDate()))
 
-    return sumUpsertResults(assetResults: assetResults, fileResults: fileResults)
+        for photokitResource in photokitAsset.resources {
+          fileResults.append(try processResource(
+            asset: photokitAsset,
+            resource: photokitResource,
+            countryId: countryId,
+            cityId: cityId,
+            country: country,
+            city: city,
+          ))
+        }
+        runStatus.exportAssetStatus.processed()
+      }
+
+      runStatus.exportAssetStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
+      return sumUpsertResults(assetResults: assetResults, fileResults: fileResults)
+    } catch {
+      runStatus.exportAssetStatus.failed(error: "\(error)")
+      throw error // Will be caught in main method above
+    }
   }
 
   // swiftlint:disable:next function_parameter_count
@@ -236,57 +205,74 @@ struct AssetExporter {
   }
 
   private func markDeletedAssetsAndFiles() async throws -> (Int, Int) {
-    logger.debug("Finding Asset and File IDs deleted from Photos...")
-    var exportedAssetIds = try exporterDB.getAssetIdSet()
-    var exportedFileIds = try exporterDB.getFileIdSet()
-    let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
+    do {
+      logger.debug("Finding Asset and File IDs deleted from Photos...")
+      let startTime = timeProvider.getDate()
+      runStatus.markDeletedStatus.start()
 
-    while let asset = try await allPhotokitAssetsResult.next() {
-      exportedAssetIds.remove(asset.id)
+      var exportedAssetIds = try exporterDB.getAssetIdSet()
+      var exportedFileIds = try exporterDB.getFileIdSet()
+      let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
 
-      for resource in asset.resources {
-        let id = ExportedFile.generateId(
-          asset: asset,
-          resource: resource
-        )
-        exportedFileIds.remove(id)
+      while let asset = try await allPhotokitAssetsResult.next() {
+        exportedAssetIds.remove(asset.id)
+
+        for resource in asset.resources {
+          let id = ExportedFile.generateId(
+            asset: asset,
+            resource: resource
+          )
+          exportedFileIds.remove(id)
+        }
       }
-    }
 
-    if exportedAssetIds.isEmpty {
-      logger.debug("No Asset IDs have been removed from Photos")
-    } else {
-      logger.debug("Found \(exportedAssetIds.count) Asset IDs removed from Photos - updating DB...")
-      for assetId in exportedAssetIds {
-        try exporterDB.markAssetAsDeleted(id: assetId, now: timeProvider.getDate())
+      if exportedAssetIds.isEmpty {
+        logger.debug("No Asset IDs have been removed from Photos")
+      } else {
+        logger.debug("Found \(exportedAssetIds.count) Asset IDs removed from Photos - updating DB...")
+        for assetId in exportedAssetIds {
+          try exporterDB.markAssetAsDeleted(id: assetId, now: timeProvider.getDate())
+        }
       }
-    }
 
-    if exportedFileIds.isEmpty {
-      logger.debug("No File IDs have been removed from Photos")
-    } else {
-      logger.debug("Found \(exportedFileIds.count) File IDs removed from Photos - updating DB...")
-      for fileId in exportedFileIds {
-        try exporterDB.markFileAsDeleted(id: fileId, now: timeProvider.getDate())
+      if exportedFileIds.isEmpty {
+        logger.debug("No File IDs have been removed from Photos")
+      } else {
+        logger.debug("Found \(exportedFileIds.count) File IDs removed from Photos - updating DB...")
+        for fileId in exportedFileIds {
+          try exporterDB.markFileAsDeleted(id: fileId, now: timeProvider.getDate())
+        }
       }
-    }
 
-    return (exportedAssetIds.count, exportedFileIds.count)
+      runStatus.markDeletedStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
+      return (exportedAssetIds.count, exportedFileIds.count)
+    } catch {
+      runStatus.markDeletedStatus.failed(error: "\(error)")
+      throw error // Will be caught in main method above
+    }
   }
 
   private func removeExpiredAssetsAndFiles() throws -> (Int, Int) {
-    let cutoffDate = timeProvider.getDate().addingTimeInterval(Double(expiryDays * 3600 * 24 * -1))
-    logger.debug("Removing Assets and AssetFiles marked as deleted before \(cutoffDate)...")
-    let (assetsDeletedCnt, filesDeletedCnt1) = try exporterDB.deleteExpiredAssets(cutoffDate: cutoffDate)
-    let filesDeletedCnt2 = try exporterDB.deleteExpiredAssetFiles(cutoffDate: cutoffDate)
-    return (assetsDeletedCnt, filesDeletedCnt1 + filesDeletedCnt2)
+    do {
+      runStatus.removeExpiredStatus.start()
+      let startTime = timeProvider.getDate()
+      let cutoffDate = timeProvider.getDate().addingTimeInterval(Double(expiryDays * 3600 * 24 * -1))
+      logger.debug("Removing Assets and AssetFiles marked as deleted before \(cutoffDate)...")
+      let (assetsDeletedCnt, filesDeletedCnt1) = try exporterDB.deleteExpiredAssets(cutoffDate: cutoffDate)
+      let filesDeletedCnt2 = try exporterDB.deleteExpiredAssetFiles(cutoffDate: cutoffDate)
+      runStatus.removeExpiredStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
+      return (assetsDeletedCnt, filesDeletedCnt1 + filesDeletedCnt2)
+    } catch {
+      runStatus.removeExpiredStatus.failed(error: "\(error)")
+      throw error
+    }
   }
 
   // swiftlint:disable:next cyclomatic_complexity
   private func sumUpsertResults(
     assetResults: [ExporterDB.UpsertResult?],
     fileResults: [ExporterDB.UpsertResult?],
-  ) -> Result {
+  ) -> AssetExporterResult {
     var assetInsertCnt = 0
     var assetUpdateCnt = 0
     var assetUnchangedCnt = 0
@@ -321,7 +307,7 @@ struct AssetExporter {
       }
     }
 
-    return Result(
+    return AssetExporterResult(
       assetInserted: assetInsertCnt,
       assetUpdated: assetUpdateCnt,
       assetUnchanged: assetUnchangedCnt,
@@ -338,8 +324,70 @@ struct AssetExporter {
   }
 }
 
-extension AssetExporter.Result: DiffableStruct {
-  func getStructDiff(_ other: AssetExporter.Result) -> StructDiff {
+public struct AssetExporterResult: Codable, Sendable {
+  public let assetInserted: Int
+  public let assetUpdated: Int
+  public let assetUnchanged: Int
+  public let assetSkipped: Int
+  public let assetMarkedForDeletion: Int
+  public let assetDeleted: Int
+  public let fileInserted: Int
+  public let fileUpdated: Int
+  public let fileUnchanged: Int
+  public let fileSkipped: Int
+  public let fileMarkedForDeletion: Int
+  public let fileDeleted: Int
+
+  public static func empty() -> AssetExporterResult {
+    return AssetExporterResult(
+      assetInserted: 0,
+      assetUpdated: 0,
+      assetUnchanged: 0,
+      assetSkipped: 0,
+      assetMarkedForDeletion: 0,
+      assetDeleted: 0,
+      fileInserted: 0,
+      fileUpdated: 0,
+      fileUnchanged: 0,
+      fileSkipped: 0,
+      fileMarkedForDeletion: 0,
+      fileDeleted: 0,
+    )
+  }
+
+  public func copy(
+    assetInserted: Int? = nil,
+    assetUpdated: Int? = nil,
+    assetUnchanged: Int? = nil,
+    assetSkipped: Int? = nil,
+    assetMarkedForDeletion: Int? = nil,
+    assetDeleted: Int? = nil,
+    fileInserted: Int? = nil,
+    fileUpdated: Int? = nil,
+    fileUnchanged: Int? = nil,
+    fileSkipped: Int? = nil,
+    fileMarkedForDeletion: Int? = nil,
+    fileDeleted: Int? = nil,
+  ) -> AssetExporterResult {
+    return AssetExporterResult(
+      assetInserted: assetInserted ?? self.assetInserted,
+      assetUpdated: assetUpdated ?? self.assetUpdated,
+      assetUnchanged: assetUnchanged ?? self.assetUnchanged,
+      assetSkipped: assetSkipped ?? self.assetSkipped,
+      assetMarkedForDeletion: assetMarkedForDeletion ?? self.assetMarkedForDeletion,
+      assetDeleted: assetDeleted ?? self.assetDeleted,
+      fileInserted: fileInserted ?? self.fileInserted,
+      fileUpdated: fileUpdated ?? self.fileUpdated,
+      fileUnchanged: fileUnchanged ?? self.fileUnchanged,
+      fileSkipped: fileSkipped ?? self.fileSkipped,
+      fileMarkedForDeletion: fileMarkedForDeletion ?? self.fileMarkedForDeletion,
+      fileDeleted: fileDeleted ?? self.fileDeleted,
+    )
+  }
+}
+
+extension AssetExporterResult: DiffableStruct {
+  func getStructDiff(_ other: AssetExporterResult) -> StructDiff {
     return StructDiff()
       .add(diffProperty(other, \.assetInserted))
       .add(diffProperty(other, \.assetUpdated))
@@ -353,5 +401,23 @@ extension AssetExporter.Result: DiffableStruct {
       .add(diffProperty(other, \.fileSkipped))
       .add(diffProperty(other, \.fileMarkedForDeletion))
       .add(diffProperty(other, \.fileDeleted))
+  }
+}
+
+@Observable
+public class AssetExporterStatus: PhotosExporterLib.RunStatus {
+  public let exportAssetStatus: PhotosExporterLib.RunStatusWithProgress
+  public let markDeletedStatus: PhotosExporterLib.RunStatus
+  public let removeExpiredStatus: PhotosExporterLib.RunStatus
+
+  public init(
+    exportAssetStatus: PhotosExporterLib.RunStatusWithProgress? = nil,
+    markDeletedStatus: PhotosExporterLib.RunStatus? = nil,
+    removeExpiredStatus: PhotosExporterLib.RunStatus? = nil,
+  ) {
+    self.exportAssetStatus = exportAssetStatus ?? PhotosExporterLib.RunStatusWithProgress()
+    self.markDeletedStatus = markDeletedStatus ?? PhotosExporterLib.RunStatus()
+    self.removeExpiredStatus = removeExpiredStatus ?? PhotosExporterLib.RunStatus()
+    super.init()
   }
 }

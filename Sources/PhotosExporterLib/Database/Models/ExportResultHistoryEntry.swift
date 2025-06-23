@@ -151,15 +151,37 @@ extension ExportResultHistoryEntry: Identifiable, FetchableRecord, PersistableRe
 // Create a separate struct to avoid leaking out all of our
 // internal implementation details
 public struct HistoryEntry {
-  let id: String
-  let createdAt: Date
-  let exportResult: PhotosExporterLib.Result
-  let assetCount: Int
-  let fileCount: Int
-  let albumCount: Int
-  let folderCount: Int
-  let fileSizeTotal: Int64
-  let runTime: Decimal
+  public let id: String
+  public let createdAt: Date
+  public let exportResult: PhotosExporterLib.Result
+  public let assetCount: Int
+  public let fileCount: Int
+  public let albumCount: Int
+  public let folderCount: Int
+  public let fileSizeTotal: Int64
+  public let runTime: Decimal
+
+  public init(
+    id: String,
+    createdAt: Date,
+    exportResult: PhotosExporterLib.Result,
+    assetCount: Int,
+    fileCount: Int,
+    albumCount: Int,
+    folderCount: Int,
+    fileSizeTotal: Int64,
+    runTime: Decimal,
+  ) {
+    self.id = id
+    self.createdAt = createdAt
+    self.exportResult = exportResult
+    self.assetCount = assetCount
+    self.fileCount = fileCount
+    self.albumCount = albumCount
+    self.folderCount = folderCount
+    self.fileSizeTotal = fileSizeTotal
+    self.runTime = runTime
+  }
 }
 
 extension HistoryEntry: DiffableStruct {
