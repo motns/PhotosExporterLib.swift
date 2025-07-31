@@ -18,8 +18,6 @@ import Foundation
 import Logging
 
 struct CollectionExporter {
-  public let runStatus: CollectionExporterStatus
-
   private let exporterDB: ExporterDB
   private let photokit: PhotokitProtocol
   private let timeProvider: TimeProvider
@@ -35,39 +33,56 @@ struct CollectionExporter {
     timeProvider: TimeProvider,
     logger: Logger,
   ) {
-    self.runStatus = CollectionExporterStatus()
     self.exporterDB = exporterDB
     self.photokit = photokit
     self.timeProvider = timeProvider
     self.logger = ClassLogger(className: "CollectionExporter", logger: logger)
   }
 
-  func export(isEnabled: Bool = true) throws -> CollectionExporterResult {
-    guard isEnabled else {
-      logger.warning("Collection export disabled - skipping")
-      runStatus.skipped()
-      return CollectionExporterResult.empty()
-    }
+  func export(isEnabled: Bool = true) -> AsyncThrowingStream<
+    TaskStatus<CollectionExporterResult>,
+    Swift.Error
+  > {
+    return AsyncThrowingStream(
+      bufferingPolicy: .bufferingNewest(1)
+    ) { continuation in
+      Task {
+        guard isEnabled else {
+          logger.warning("Collection export disabled - skipping")
+          continuation.yield(.skipped)
+          continuation.finish()
+          return
+        }
 
-    do {
-      logger.info("Exporting Folders and Albums to local DB...")
-      let startDate = timeProvider.getDate()
-      runStatus.start()
+        guard !Task.isCancelled else {
+          logger.warning("Collection Exporter Task cancelled")
+          continuation.yield(.cancelled)
+          continuation.finish()
+          return
+        }
 
-      let res = try exportFoldersAndAlbums()
+        continuation.yield(.running(nil))
 
-      let runTime = timeProvider.secondsPassedSince(startDate)
-      logger.info("Folder and Album export complete in \(runTime)s")
-      runStatus.complete(runTime: runTime)
-      return res
-    } catch {
-      runStatus.failed(error: "\(error)")
-      throw Error.unexpectedError("\(error)")
+        do {
+          logger.info("Exporting Folders and Albums to local DB...")
+          let startDate = await timeProvider.getDate()
+
+          let res = try await exportFoldersAndAlbums()
+
+          let runTime = await timeProvider.secondsPassedSince(startDate)
+          logger.info("Folder and Album export complete in \(runTime)s")
+          continuation.yield(.complete(res))
+          continuation.finish()
+        } catch {
+          continuation.yield(.failed("\(error)"))
+          continuation.finish(throwing: Error.unexpectedError("\(error)"))
+        }
+      }
     }
   }
 
-  private func exportFoldersAndAlbums() throws -> CollectionExporterResult {
-    let rootFolderResult = try processPhotokitFolder(
+  private func exportFoldersAndAlbums() async throws -> CollectionExporterResult {
+    let rootFolderResult = try await processPhotokitFolder(
       folder: try self.photokit.getRootFolder(),
       parentId: nil
     )
@@ -77,7 +92,7 @@ struct CollectionExporter {
     var albumUnchangedCnt = 0
 
     logger.debug("Processing shared Albums...")
-    let sharedAlbums = try self.photokit.getSharedAlbums()
+    let sharedAlbums = try await self.photokit.getSharedAlbums()
     for sharedAlbum in sharedAlbums {
       let albumUpsertRes = try self.exporterDB.upsertAlbum(
         album: ExportedAlbum.fromPhotokitAlbum(
@@ -103,11 +118,12 @@ struct CollectionExporter {
   private func processPhotokitFolder(
     folder: PhotokitFolder,
     parentId: String?,
-  ) throws -> CollectionExporterResult {
+  ) async throws -> CollectionExporterResult {
     let loggerMetadata: Logger.Metadata = [
       "folder_id": "\(folder.id)"
     ]
     logger.debug("Processing Folder...", loggerMetadata)
+    let startTime = await timeProvider.getDate()
 
     var folderInsertedCnt = 0
     var folderUpdatedCnt = 0
@@ -115,6 +131,7 @@ struct CollectionExporter {
     var albumInsertedCnt = 0
     var albumUpdatedCnt = 0
     var albumUnchangedCnt = 0
+    var runTime: Double = 0
 
     let exportedFolder = ExportedFolder.fromPhotokitFolder(
       folder: folder,
@@ -139,15 +156,17 @@ struct CollectionExporter {
       case .nochange: albumUnchangedCnt += 1
       }
     }
+    runTime = await timeProvider.secondsPassedSince(startTime)
 
     for subfolder in folder.subfolders {
-      let subfolderRes = try processPhotokitFolder(folder: subfolder, parentId: folder.id)
+      let subfolderRes = try await processPhotokitFolder(folder: subfolder, parentId: folder.id)
       folderInsertedCnt += subfolderRes.folderInserted
       folderUpdatedCnt += subfolderRes.folderUpdated
       folderUnchangedCnt += subfolderRes.folderUnchanged
       albumInsertedCnt += subfolderRes.albumInserted
       albumUpdatedCnt += subfolderRes.albumUpdated
       albumUnchangedCnt += subfolderRes.albumUnchanged
+      runTime += subfolderRes.runTime
     }
 
     return CollectionExporterResult(
@@ -159,11 +178,12 @@ struct CollectionExporter {
       albumUpdated: albumUpdatedCnt,
       albumUnchanged: albumUnchangedCnt,
       albumDeleted: 0, // TODO
+      runTime: runTime,
     )
   }
 }
 
-public struct CollectionExporterResult: Codable, Sendable, Equatable {
+public struct CollectionExporterResult: Codable, Sendable, Equatable, Timeable {
   public let folderInserted: Int
   public let folderUpdated: Int
   public let folderUnchanged: Int
@@ -172,6 +192,7 @@ public struct CollectionExporterResult: Codable, Sendable, Equatable {
   public let albumUpdated: Int
   public let albumUnchanged: Int
   public let albumDeleted: Int
+  public let runTime: Double
 
   public func copy(
     folderInserted: Int? = nil,
@@ -182,6 +203,7 @@ public struct CollectionExporterResult: Codable, Sendable, Equatable {
     albumUpdated: Int? = nil,
     albumUnchanged: Int? = nil,
     albumDeleted: Int? = nil,
+    runTime: Double? = nil,
   ) -> CollectionExporterResult {
     return CollectionExporterResult(
       folderInserted: folderInserted ?? self.folderInserted,
@@ -192,6 +214,7 @@ public struct CollectionExporterResult: Codable, Sendable, Equatable {
       albumUpdated: albumUpdated ?? self.albumUpdated,
       albumUnchanged: albumUnchanged ?? self.albumUnchanged,
       albumDeleted: albumDeleted ?? self.albumDeleted,
+      runTime: runTime ?? self.runTime,
     )
   }
 
@@ -205,6 +228,7 @@ public struct CollectionExporterResult: Codable, Sendable, Equatable {
       albumUpdated: 0,
       albumUnchanged: 0,
       albumDeleted: 0,
+      runTime: 0,
     )
   }
 }
@@ -220,8 +244,6 @@ extension CollectionExporterResult: DiffableStruct {
       .add(diffProperty(other, \.albumUpdated))
       .add(diffProperty(other, \.albumUnchanged))
       .add(diffProperty(other, \.albumDeleted))
+      .add(diffProperty(other, \.runTime))
   }
 }
-
-@Observable
-public class CollectionExporterStatus: PhotosExporterLib.RunStatus {}

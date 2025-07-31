@@ -19,9 +19,7 @@ import Logging
 
 // swiftlint:disable file_length
 // swiftlint:disable:next type_body_length
-struct AssetExporter {
-  public let runStatus: AssetExporterStatus
-
+struct AssetExporter: Sendable {
   private var exporterDB: ExporterDB
   private var photosDB: PhotosDBProtocol
   private let countryLookup: CachedLookupTable
@@ -43,7 +41,6 @@ struct AssetExporter {
     timeProvider: TimeProvider,
     expiryDays: Int = 30,
   ) {
-    self.runStatus = AssetExporterStatus()
     self.exporterDB = exporterDB
     self.photosDB = photosDB
     self.photokit = photokit
@@ -54,96 +51,229 @@ struct AssetExporter {
     self.expiryDays = expiryDays
   }
 
-  func export(isEnabled: Bool = true) async throws -> AssetExporterResult {
-    guard isEnabled else {
-      logger.warning("Asset export disabled - skipping")
-      runStatus.skipped()
-      return AssetExporterResult.empty()
-    }
+  // swiftlint:disable:next function_body_length cyclomatic_complexity
+  func export(isEnabled: Bool = true) -> AsyncThrowingStream<
+    AssetExporterStatus,
+    Swift.Error
+  > {
+    return AsyncThrowingStream(bufferingPolicy: .bufferingNewest(10)) { continuation in
+      Task {
+        var status = AssetExporterStatus.notStarted()
+        let startTime = await timeProvider.getDate()
 
-    do {
-      runStatus.start()
-      let startDate = timeProvider.getDate()
-      let assetExportResult = try await exportAssets()
-      let (assetMarkedCnt, fileMarkedCnt) = try await markDeletedAssetsAndFiles()
-      let (assetDeletedCnt, fileDeletedCnt) = try removeExpiredAssetsAndFiles()
+        guard isEnabled else {
+          logger.warning("Asset export disabled - skipping")
+          status = status.withMainStatus(.skipped)
+          continuation.yield(status)
+          continuation.finish()
+          return
+        }
 
-      let runTime = timeProvider.secondsPassedSince(startDate)
-      logger.info("Asset export complete in \(runTime)s")
-      runStatus.complete(runTime: runTime)
-      return assetExportResult.copy(
-        assetMarkedForDeletion: assetMarkedCnt,
-        assetDeleted: assetDeletedCnt,
-        fileMarkedForDeletion: fileMarkedCnt,
-        fileDeleted: fileDeletedCnt,
-      )
-    } catch {
-      runStatus.failed(error: "\(error)")
-      throw Error.unexpectedError("\(error)")
+        guard !Task.isCancelled else {
+          logger.warning("Asset Exporter Task cancelled")
+          status = status.withMainStatus(.cancelled)
+          continuation.yield(status)
+          continuation.finish()
+          return
+        }
+
+        var assetExportResult = AssetExporterResult.empty()
+
+        status = status.withMainStatus(.running(nil))
+        continuation.yield(status)
+        for try await exportAssetStatus in exportAssets() {
+          switch exportAssetStatus {
+          case .notStarted, .skipped, .cancelled: break
+          case .running:
+            status = status.withExportAssetStatus(exportAssetStatus)
+            continuation.yield(status)
+          case .failed(let error):
+            status = status
+              .withMainStatus(.failed(error))
+              .withExportAssetStatus(exportAssetStatus)
+            continuation.yield(status)
+            continuation.finish(throwing: Error.unexpectedError("\(error)"))
+            return
+          case .complete(let result):
+            assetExportResult = result
+            status = status.withExportAssetStatus(exportAssetStatus)
+            continuation.yield(status)
+          }
+        }
+
+        guard !Task.isCancelled else {
+          logger.warning("Asset Exporter Task cancelled")
+          status = status.withMainStatus(.cancelled)
+          continuation.yield(status)
+          continuation.finish()
+          return
+        }
+
+        var assetMarkedDeleteResult = AssetMarkedDeletedResult.empty()
+
+        for try await markDeletedStatus in markDeletedAssetsAndFiles() {
+          switch markDeletedStatus {
+          case .notStarted, .skipped, .cancelled: break
+          case .running:
+            status = status.withMarkDeletedStatus(markDeletedStatus)
+            continuation.yield(status)
+          case .failed(let error):
+            status = status
+              .withMainStatus(.failed(error))
+              .withMarkDeletedStatus(markDeletedStatus)
+            continuation.yield(status)
+            continuation.finish(throwing: Error.unexpectedError("\(error)"))
+            return
+          case .complete(let result):
+            assetMarkedDeleteResult = result
+            status = status.withMarkDeletedStatus(markDeletedStatus)
+            continuation.yield(status)
+          }
+        }
+
+        guard !Task.isCancelled else {
+          logger.warning("Asset Exporter Task cancelled")
+          status = status.withMainStatus(.cancelled)
+          continuation.yield(status)
+          continuation.finish()
+          return
+        }
+
+        var removedExpiredAssetResult = RemoveExpiredAssetResult.empty()
+
+        for try await removeExpiredStatus in removeExpiredAssetsAndFiles() {
+          switch removeExpiredStatus {
+          case .notStarted, .skipped, .cancelled: break
+          case .running:
+            status = status.withRemoveExpiredStatus(removeExpiredStatus)
+            continuation.yield(status)
+          case .failed(let error):
+            status = status
+              .withMainStatus(.failed(error))
+              .withRemoveExpiredStatus(removeExpiredStatus)
+            continuation.yield(status)
+            continuation.finish(throwing: Error.unexpectedError("\(error)"))
+            return
+          case .complete(let result):
+            removedExpiredAssetResult = result
+            status = status.withRemoveExpiredStatus(removeExpiredStatus)
+            continuation.yield(status)
+          }
+        }
+
+        let runTime = await timeProvider.secondsPassedSince(startTime)
+        logger.info("Asset export complete in \(runTime)s")
+
+        status = status.withMainStatus(.complete(
+          assetExportResult.copy(
+            assetMarkedForDeletion: assetMarkedDeleteResult.assetMarkedCnt,
+            assetDeleted: removedExpiredAssetResult.assetDeletedCnt,
+            fileMarkedForDeletion: assetMarkedDeleteResult.fileMarkedCnt,
+            fileDeleted: removedExpiredAssetResult.fileDeletedCnt,
+            runTime: runTime,
+          )
+        ))
+        continuation.yield(status)
+        continuation.finish()
+      }
     }
   }
 
   // swiftlint:disable:next function_body_length
-  private func exportAssets() async throws -> AssetExporterResult {
-    do {
-      logger.info("Exporting Assets to local DB...")
-      let startTime = timeProvider.getDate()
-      runStatus.exportAssetStatus.start()
+  private func exportAssets() -> AsyncThrowingStream<
+    TaskStatus<AssetExporterResult>,
+    Swift.Error
+  > {
+    return AsyncThrowingStream { continuation in
+      Task {
+        var status: TaskStatus<AssetExporterResult> = .notStarted
 
-      let assetLocationById = try photosDB.getAllAssetLocationsById()
-      let assetScoreById = try photosDB.getAllAssetScoresById()
-      let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
-      var assetResults = [ExporterDB.UpsertResult?]()
-      var fileResults = [ExporterDB.UpsertResult?]()
+        do {
+          logger.info("Exporting Assets to local DB...")
+          let startTime = await timeProvider.getDate()
+          status = .running(nil)
+          continuation.yield(status)
 
-      runStatus.exportAssetStatus.startProgress(toProcess: allPhotokitAssetsResult.count)
+          guard !Task.isCancelled else {
+            logger.info("Export Asset Task cancelled")
+            continuation.yield(.cancelled)
+            continuation.finish()
+            return
+          }
 
-      while let photokitAsset = try await allPhotokitAssetsResult.next() {
-        let assetLocation = assetLocationById[photokitAsset.uuid]
+          let assetLocationById = try await photosDB.getAllAssetLocationsById()
+          let assetScoreById = try await photosDB.getAllAssetScoresById()
+          let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
+          var assetResults = [ExporterDB.UpsertResult?]()
+          var fileResults = [ExporterDB.UpsertResult?]()
 
-        let (country, countryId): (String?, Int64?) = switch assetLocation?.country {
-        case .none: (nil, nil)
-        case .some(let country): (country, try countryLookup.getIdByName(name: country))
-        }
+          var progress = TaskProgress(toProcess: allPhotokitAssetsResult.count)
+          status = .running(progress)
+          continuation.yield(status)
 
-        let (city, cityId): (String?, Int64?) = switch assetLocation?.city {
-        case .none: (nil, nil)
-        case .some(let city): (city, try cityLookup.getIdByName(name: city))
-        }
+          while let photokitAsset = try await allPhotokitAssetsResult.next() {
+            guard !Task.isCancelled else {
+              logger.info("Export Asset Task cancelled")
+              continuation.yield(.cancelled)
+              continuation.finish()
+              return
+            }
 
-        let exportedAssetOpt = ExportedAsset.fromPhotokitAsset(
-          asset: photokitAsset,
-          aestheticScore: assetScoreById[photokitAsset.uuid] ?? 0,
-          now: self.timeProvider.getDate()
-        )
-        guard let exportedAsset = exportedAssetOpt else {
-          logger.warning(
-            "Could not convert Photokit Asset to Exported Asset",
-            ["asset_id": "\(photokitAsset.id)"]
-          )
-          assetResults.append(nil)
-          continue
-        }
-        assetResults.append(try exporterDB.upsertAsset(asset: exportedAsset, now: timeProvider.getDate()))
+            let assetLocation = assetLocationById[photokitAsset.uuid]
 
-        for photokitResource in photokitAsset.resources {
-          fileResults.append(try processResource(
-            asset: photokitAsset,
-            resource: photokitResource,
-            countryId: countryId,
-            cityId: cityId,
-            country: country,
-            city: city,
+            let (country, countryId): (String?, Int64?) = switch assetLocation?.country {
+            case .none: (nil, nil)
+            case .some(let country): (country, try await countryLookup.getIdByName(name: country))
+            }
+
+            let (city, cityId): (String?, Int64?) = switch assetLocation?.city {
+            case .none: (nil, nil)
+            case .some(let city): (city, try await cityLookup.getIdByName(name: city))
+            }
+
+            let exportedAssetOpt = ExportedAsset.fromPhotokitAsset(
+              asset: photokitAsset,
+              aestheticScore: assetScoreById[photokitAsset.uuid] ?? 0,
+              now: await self.timeProvider.getDate()
+            )
+            guard let exportedAsset = exportedAssetOpt else {
+              logger.warning(
+                "Could not convert Photokit Asset to Exported Asset",
+                ["asset_id": "\(photokitAsset.id)"]
+              )
+              assetResults.append(nil)
+              continue
+            }
+            assetResults.append(try exporterDB.upsertAsset(asset: exportedAsset, now: await timeProvider.getDate()))
+
+            for photokitResource in photokitAsset.resources {
+              fileResults.append(try await processResource(
+                asset: photokitAsset,
+                resource: photokitResource,
+                countryId: countryId,
+                cityId: cityId,
+                country: country,
+                city: city,
+              ))
+            }
+            progress = progress.processed()
+            status = .running(progress)
+            continuation.yield(status)
+          }
+
+          continuation.yield(.complete(
+            sumUpsertResults(
+              assetResults: assetResults,
+              fileResults: fileResults,
+              runTime: await timeProvider.secondsPassedSince(startTime)
+            )
           ))
+          continuation.finish()
+        } catch {
+          continuation.yield(.failed("\(error)"))
+          continuation.finish(throwing: error)
         }
-        runStatus.exportAssetStatus.processed()
       }
-
-      runStatus.exportAssetStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
-      return sumUpsertResults(assetResults: assetResults, fileResults: fileResults)
-    } catch {
-      runStatus.exportAssetStatus.failed(error: "\(error)")
-      throw error // Will be caught in main method above
     }
   }
 
@@ -155,7 +285,7 @@ struct AssetExporter {
     cityId: Int64?,
     country: String?,
     city: String?,
-  ) throws -> ExporterDB.UpsertResult? {
+  ) async throws -> ExporterDB.UpsertResult? {
     // Filter out supplementary files like adjustment data
     guard FileType.fromPhotokitAssetResourceType(resource.assetResourceType) != nil else {
       logger.trace(
@@ -172,7 +302,7 @@ struct AssetExporter {
     let exportedFileOpt = ExportedFile.fromPhotokitAssetResource(
       asset: asset,
       resource: resource,
-      now: timeProvider.getDate(),
+      now: await timeProvider.getDate(),
       countryId: countryId,
       cityId: cityId,
       country: country,
@@ -204,67 +334,115 @@ struct AssetExporter {
     return fileResult.merge(assetFileResult)
   }
 
-  private func markDeletedAssetsAndFiles() async throws -> (Int, Int) {
-    do {
-      logger.debug("Finding Asset and File IDs deleted from Photos...")
-      let startTime = timeProvider.getDate()
-      runStatus.markDeletedStatus.start()
+  // swiftlint:disable:next function_body_length
+  private func markDeletedAssetsAndFiles() -> AsyncThrowingStream<
+    TaskStatus<AssetMarkedDeletedResult>,
+    Swift.Error
+  > {
+    return AsyncThrowingStream { continuation in
+      Task {
+        do {
+          logger.debug("Finding Asset and File IDs deleted from Photos...")
+          let startTime = await timeProvider.getDate()
+          continuation.yield(TaskStatus<AssetMarkedDeletedResult>.running(nil))
 
-      var exportedAssetIds = try exporterDB.getAssetIdSet()
-      var exportedFileIds = try exporterDB.getFileIdSet()
-      let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
+          guard !Task.isCancelled else {
+            logger.info("Mark Deleted Assets Task cancelled")
+            continuation.yield(.cancelled)
+            continuation.finish()
+            return
+          }
 
-      while let asset = try await allPhotokitAssetsResult.next() {
-        exportedAssetIds.remove(asset.id)
+          var exportedAssetIds = try exporterDB.getAssetIdSet()
+          var exportedFileIds = try exporterDB.getFileIdSet()
+          let allPhotokitAssetsResult = try await photokit.getAllAssetsResult()
 
-        for resource in asset.resources {
-          let id = ExportedFile.generateId(
-            asset: asset,
-            resource: resource
-          )
-          exportedFileIds.remove(id)
+          while let asset = try await allPhotokitAssetsResult.next() {
+            exportedAssetIds.remove(asset.id)
+
+            for resource in asset.resources {
+              let id = ExportedFile.generateId(
+                asset: asset,
+                resource: resource
+              )
+              exportedFileIds.remove(id)
+            }
+          }
+
+          if exportedAssetIds.isEmpty {
+            logger.debug("No Asset IDs have been removed from Photos")
+          } else {
+            logger.debug("Found \(exportedAssetIds.count) Asset IDs removed from Photos - updating DB...")
+            for assetId in exportedAssetIds {
+              guard !Task.isCancelled else {
+                logger.info("Mark Deleted Assets Task cancelled")
+                continuation.yield(.cancelled)
+                continuation.finish()
+                return
+              }
+
+              try exporterDB.markAssetAsDeleted(id: assetId, now: await timeProvider.getDate())
+            }
+          }
+
+          if exportedFileIds.isEmpty {
+            logger.debug("No File IDs have been removed from Photos")
+          } else {
+            logger.debug("Found \(exportedFileIds.count) File IDs removed from Photos - updating DB...")
+            for fileId in exportedFileIds {
+              guard !Task.isCancelled else {
+                logger.info("Mark Deleted Assets Task cancelled")
+                continuation.yield(.cancelled)
+                continuation.finish()
+                return
+              }
+
+              try exporterDB.markFileAsDeleted(id: fileId, now: await timeProvider.getDate())
+            }
+          }
+
+          continuation.yield(.complete(
+            AssetMarkedDeletedResult(
+              assetMarkedCnt: exportedAssetIds.count,
+              fileMarkedCnt: exportedFileIds.count,
+              runTime: await timeProvider.secondsPassedSince(startTime),
+            )
+          ))
+          continuation.finish()
+        } catch {
+          continuation.yield(.failed("\(error)"))
+          continuation.finish(throwing: error)
         }
       }
-
-      if exportedAssetIds.isEmpty {
-        logger.debug("No Asset IDs have been removed from Photos")
-      } else {
-        logger.debug("Found \(exportedAssetIds.count) Asset IDs removed from Photos - updating DB...")
-        for assetId in exportedAssetIds {
-          try exporterDB.markAssetAsDeleted(id: assetId, now: timeProvider.getDate())
-        }
-      }
-
-      if exportedFileIds.isEmpty {
-        logger.debug("No File IDs have been removed from Photos")
-      } else {
-        logger.debug("Found \(exportedFileIds.count) File IDs removed from Photos - updating DB...")
-        for fileId in exportedFileIds {
-          try exporterDB.markFileAsDeleted(id: fileId, now: timeProvider.getDate())
-        }
-      }
-
-      runStatus.markDeletedStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
-      return (exportedAssetIds.count, exportedFileIds.count)
-    } catch {
-      runStatus.markDeletedStatus.failed(error: "\(error)")
-      throw error // Will be caught in main method above
     }
   }
 
-  private func removeExpiredAssetsAndFiles() throws -> (Int, Int) {
-    do {
-      runStatus.removeExpiredStatus.start()
-      let startTime = timeProvider.getDate()
-      let cutoffDate = timeProvider.getDate().addingTimeInterval(Double(expiryDays * 3600 * 24 * -1))
-      logger.debug("Removing Assets and AssetFiles marked as deleted before \(cutoffDate)...")
-      let (assetsDeletedCnt, filesDeletedCnt1) = try exporterDB.deleteExpiredAssets(cutoffDate: cutoffDate)
-      let filesDeletedCnt2 = try exporterDB.deleteExpiredAssetFiles(cutoffDate: cutoffDate)
-      runStatus.removeExpiredStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
-      return (assetsDeletedCnt, filesDeletedCnt1 + filesDeletedCnt2)
-    } catch {
-      runStatus.removeExpiredStatus.failed(error: "\(error)")
-      throw error
+  private func removeExpiredAssetsAndFiles() -> AsyncThrowingStream<
+    TaskStatus<RemoveExpiredAssetResult>,
+    Swift.Error
+  > {
+    return AsyncThrowingStream { continuation in
+      Task {
+        do {
+          continuation.yield(TaskStatus<RemoveExpiredAssetResult>.running(nil))
+          let startTime = await timeProvider.getDate()
+          let cutoffDate = await timeProvider.getDate().addingTimeInterval(Double(expiryDays * 3600 * 24 * -1))
+          logger.debug("Removing Assets and AssetFiles marked as deleted before \(cutoffDate)...")
+          let (assetsDeletedCnt, filesDeletedCnt1) = try exporterDB.deleteExpiredAssets(cutoffDate: cutoffDate)
+          let filesDeletedCnt2 = try exporterDB.deleteExpiredAssetFiles(cutoffDate: cutoffDate)
+          continuation.yield(.complete(
+            RemoveExpiredAssetResult(
+              assetDeletedCnt: assetsDeletedCnt,
+              fileDeletedCnt: filesDeletedCnt1 + filesDeletedCnt2,
+              runTime: await timeProvider.secondsPassedSince(startTime),
+            )
+          ))
+          continuation.finish()
+        } catch {
+          continuation.yield(.failed("\(error)"))
+          continuation.finish(throwing: error)
+        }
+      }
     }
   }
 
@@ -272,6 +450,7 @@ struct AssetExporter {
   private func sumUpsertResults(
     assetResults: [ExporterDB.UpsertResult?],
     fileResults: [ExporterDB.UpsertResult?],
+    runTime: Double,
   ) -> AssetExporterResult {
     var assetInsertCnt = 0
     var assetUpdateCnt = 0
@@ -320,11 +499,12 @@ struct AssetExporter {
       fileSkipped: fileSkippedCnt,
       fileMarkedForDeletion: 0,
       fileDeleted: 0,
+      runTime: runTime,
     )
   }
 }
 
-public struct AssetExporterResult: Codable, Sendable {
+public struct AssetExporterResult: Codable, Sendable, Timeable {
   public let assetInserted: Int
   public let assetUpdated: Int
   public let assetUnchanged: Int
@@ -337,6 +517,7 @@ public struct AssetExporterResult: Codable, Sendable {
   public let fileSkipped: Int
   public let fileMarkedForDeletion: Int
   public let fileDeleted: Int
+  public let runTime: Double
 
   public static func empty() -> AssetExporterResult {
     return AssetExporterResult(
@@ -352,6 +533,7 @@ public struct AssetExporterResult: Codable, Sendable {
       fileSkipped: 0,
       fileMarkedForDeletion: 0,
       fileDeleted: 0,
+      runTime: 0,
     )
   }
 
@@ -368,6 +550,7 @@ public struct AssetExporterResult: Codable, Sendable {
     fileSkipped: Int? = nil,
     fileMarkedForDeletion: Int? = nil,
     fileDeleted: Int? = nil,
+    runTime: Double? = nil,
   ) -> AssetExporterResult {
     return AssetExporterResult(
       assetInserted: assetInserted ?? self.assetInserted,
@@ -382,6 +565,7 @@ public struct AssetExporterResult: Codable, Sendable {
       fileSkipped: fileSkipped ?? self.fileSkipped,
       fileMarkedForDeletion: fileMarkedForDeletion ?? self.fileMarkedForDeletion,
       fileDeleted: fileDeleted ?? self.fileDeleted,
+      runTime: runTime ?? self.runTime,
     )
   }
 }
@@ -401,23 +585,88 @@ extension AssetExporterResult: DiffableStruct {
       .add(diffProperty(other, \.fileSkipped))
       .add(diffProperty(other, \.fileMarkedForDeletion))
       .add(diffProperty(other, \.fileDeleted))
+      .add(diffProperty(other, \.runTime))
   }
 }
 
-@Observable
-public class AssetExporterStatus: PhotosExporterLib.RunStatus {
-  public let exportAssetStatus: PhotosExporterLib.RunStatusWithProgress
-  public let markDeletedStatus: PhotosExporterLib.RunStatus
-  public let removeExpiredStatus: PhotosExporterLib.RunStatus
+public struct AssetMarkedDeletedResult: Sendable, Timeable {
+  public let assetMarkedCnt: Int
+  public let fileMarkedCnt: Int
+  public let runTime: Double
 
-  public init(
-    exportAssetStatus: PhotosExporterLib.RunStatusWithProgress? = nil,
-    markDeletedStatus: PhotosExporterLib.RunStatus? = nil,
-    removeExpiredStatus: PhotosExporterLib.RunStatus? = nil,
-  ) {
-    self.exportAssetStatus = exportAssetStatus ?? PhotosExporterLib.RunStatusWithProgress()
-    self.markDeletedStatus = markDeletedStatus ?? PhotosExporterLib.RunStatus()
-    self.removeExpiredStatus = removeExpiredStatus ?? PhotosExporterLib.RunStatus()
-    super.init()
+  static func empty() -> AssetMarkedDeletedResult {
+    return AssetMarkedDeletedResult(
+      assetMarkedCnt: 0,
+      fileMarkedCnt: 0,
+      runTime: 0,
+    )
+  }
+}
+
+public struct RemoveExpiredAssetResult: Sendable, Timeable {
+  public let assetDeletedCnt: Int
+  public let fileDeletedCnt: Int
+  public let runTime: Double
+
+  static func empty() -> RemoveExpiredAssetResult {
+    return RemoveExpiredAssetResult(
+      assetDeletedCnt: 0,
+      fileDeletedCnt: 0,
+      runTime: 0,
+    )
+  }
+}
+
+public struct AssetExporterStatus: Sendable {
+  public let status: TaskStatus<AssetExporterResult>
+  public let exportAssetStatus: TaskStatus<AssetExporterResult>
+  public let markDeletedStatus: TaskStatus<AssetMarkedDeletedResult>
+  public let removeExpiredStatus: TaskStatus<RemoveExpiredAssetResult>
+
+  static func notStarted() -> AssetExporterStatus {
+    return AssetExporterStatus(
+      status: .notStarted,
+      exportAssetStatus: .notStarted,
+      markDeletedStatus: .notStarted,
+      removeExpiredStatus: .notStarted,
+    )
+  }
+
+  func copy(
+    status: TaskStatus<AssetExporterResult>? = nil,
+    exportAssetStatus: TaskStatus<AssetExporterResult>? = nil,
+    markDeletedStatus: TaskStatus<AssetMarkedDeletedResult>? = nil,
+    removeExpiredStatus: TaskStatus<RemoveExpiredAssetResult>? = nil,
+  ) -> AssetExporterStatus {
+    return AssetExporterStatus(
+      status: status ?? self.status,
+      exportAssetStatus: exportAssetStatus ?? self.exportAssetStatus,
+      markDeletedStatus: markDeletedStatus ?? self.markDeletedStatus,
+      removeExpiredStatus: removeExpiredStatus ?? self.removeExpiredStatus,
+    )
+  }
+
+  func withMainStatus(_ newStatus: TaskStatus<AssetExporterResult>) -> AssetExporterStatus {
+    return copy(
+      status: newStatus,
+    )
+  }
+
+  func withExportAssetStatus(_ newStatus: TaskStatus<AssetExporterResult>) -> AssetExporterStatus {
+    return copy(
+      exportAssetStatus: newStatus,
+    )
+  }
+
+  func withMarkDeletedStatus(_ newStatus: TaskStatus<AssetMarkedDeletedResult>) -> AssetExporterStatus {
+    return copy(
+      markDeletedStatus: newStatus,
+    )
+  }
+
+  func withRemoveExpiredStatus(_ newStatus: TaskStatus<RemoveExpiredAssetResult>) -> AssetExporterStatus {
+    return copy(
+      removeExpiredStatus: newStatus,
+    )
   }
 }

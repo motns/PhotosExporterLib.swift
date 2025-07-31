@@ -459,6 +459,7 @@ struct TestDataGenerator {
         fileSkipped: Int.random(in: 0...9999),
         fileMarkedForDeletion: Int.random(in: 0...9999),
         fileDeleted: Int.random(in: 0...9999),
+        runTime: Double.random(in: 10...200),
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: Int.random(in: 0...9999),
@@ -469,11 +470,14 @@ struct TestDataGenerator {
         albumUpdated: Int.random(in: 0...9999),
         albumUnchanged: Int.random(in: 0...9999),
         albumDeleted: Int.random(in: 0...9999),
+        runTime: Double.random(in: 10...200),
       ),
       fileExport: FileExporterResult(
         copied: Int.random(in: 0...9999),
         deleted: Int.random(in: 0...9999),
-      )
+        runTime: Double.random(in: 10...200),
+      ),
+      runTime: Double.random(in: 10...200),
     )
   }
 

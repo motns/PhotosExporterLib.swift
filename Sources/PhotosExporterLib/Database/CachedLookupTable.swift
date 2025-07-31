@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import Logging
 
-final class CachedLookupTable {
+actor CachedLookupTable {
   private var cache = [String: Int64]()
   private let exporterDB: ExporterDB
   private let logger: ClassLogger

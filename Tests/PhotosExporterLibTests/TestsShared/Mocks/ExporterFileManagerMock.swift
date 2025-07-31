@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 @testable import PhotosExporterLib
 
-class ExporterFileManagerMock: ExporterFileManagerProtocol {
+actor ExporterFileManagerMock: ExporterFileManagerProtocol {
   var pathExistsResult: ExporterFileManager.PathExistsResult
   public private(set) var createSymlinkCalls: [CreateSymlinkCall]
   public private(set) var removeCalls: [RemoveCall]
@@ -41,12 +41,12 @@ class ExporterFileManagerMock: ExporterFileManagerProtocol {
     return pathExistsResult
   }
 
-  func createDirectory(url: URL) throws -> ExporterFileManager.CreateResult {
-    return try ExporterFileManager.shared.createDirectory(url: url)
+  func createDirectory(url: URL) async throws -> ExporterFileManager.CreateResult {
+    return try await ExporterFileManager.shared.createDirectory(url: url)
   }
 
-  func createDirectory(path: String) throws -> ExporterFileManager.CreateResult {
-    return try ExporterFileManager.shared.createDirectory(path: path)
+  func createDirectory(path: String) async throws -> ExporterFileManager.CreateResult {
+    return try await ExporterFileManager.shared.createDirectory(path: path)
   }
 
   func createSymlink(src: URL, dest: URL) throws -> ExporterFileManager.CreateResult {
@@ -54,9 +54,9 @@ class ExporterFileManagerMock: ExporterFileManagerProtocol {
     return .success
   }
 
-  func remove(url: URL) throws -> ExporterFileManager.CreateResult {
+  func remove(url: URL) async throws -> ExporterFileManager.CreateResult {
     removeCalls.append(RemoveCall(url: url))
-    return try ExporterFileManager.shared.remove(url: url)
+    return try await ExporterFileManager.shared.remove(url: url)
   }
 }
 

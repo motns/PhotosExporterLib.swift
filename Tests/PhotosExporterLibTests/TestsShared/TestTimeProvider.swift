@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 @testable import PhotosExporterLib
 
-final class TestTimeProvider: TimeProvider {
+actor TestTimeProvider: TimeProvider {
   private var frozenTimestampOpt: TimeInterval?
   var isTimeFrozen: Bool {
     frozenTimestampOpt != nil

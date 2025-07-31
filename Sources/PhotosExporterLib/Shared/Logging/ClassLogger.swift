@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import Logging
 
-struct ClassLogger {
+struct ClassLogger: Sendable {
   public let logger: Logger
   private let className: String
   private let globalMetadata: Logger.Metadata
@@ -25,7 +25,7 @@ struct ClassLogger {
   init(
     className: String,
     logger: Logger? = nil,
-    metadata: Logger.Metadata? = nil
+    metadata: Logger.Metadata? = nil,
   ) {
     if let customLogger = logger {
       self.logger = customLogger

@@ -16,16 +16,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 import Foundation
 
-protocol ExporterFileManagerProtocol {
-  func pathExists(url: URL) -> ExporterFileManager.PathExistsResult
-  func pathExists(path: String) -> ExporterFileManager.PathExistsResult
-  func createDirectory(url: URL) throws -> ExporterFileManager.CreateResult
-  func createDirectory(path: String) throws -> ExporterFileManager.CreateResult
-  func createSymlink(src: URL, dest: URL) throws -> ExporterFileManager.CreateResult
-  func remove(url: URL) throws -> ExporterFileManager.CreateResult
+protocol ExporterFileManagerProtocol: Sendable {
+  func pathExists(url: URL) async -> ExporterFileManager.PathExistsResult
+  func pathExists(path: String) async -> ExporterFileManager.PathExistsResult
+  func createDirectory(url: URL) async throws -> ExporterFileManager.CreateResult
+  func createDirectory(path: String) async throws -> ExporterFileManager.CreateResult
+  func createSymlink(src: URL, dest: URL) async throws -> ExporterFileManager.CreateResult
+  func remove(url: URL) async throws -> ExporterFileManager.CreateResult
 }
 
-struct ExporterFileManager: ExporterFileManagerProtocol {
+actor ExporterFileManager: ExporterFileManagerProtocol {
   static let shared = ExporterFileManager()
 
   enum Error: Swift.Error {

@@ -18,12 +18,14 @@ import Foundation
 import Logging
 @testable import PhotosExporterLib
 
-class PhotokitMock: PhotokitProtocol {
-  var assets: [PhotokitAsset]
-  var albums: [PhotokitAlbum]
-  var sharedAlbums: [PhotokitAlbum]
-  var rootAlbums: [PhotokitAlbum]
-  var rootFolders: [PhotokitFolder]
+// @unchecked here is a bit fishy, but we only use this class
+// in a controllerd test environment anyway
+actor PhotokitMock: PhotokitProtocol {
+  public private(set) var assets: [PhotokitAsset]
+  public private(set) var albums: [PhotokitAlbum]
+  public private(set) var sharedAlbums: [PhotokitAlbum]
+  public private(set) var rootAlbums: [PhotokitAlbum]
+  public private(set) var rootFolders: [PhotokitFolder]
 
   public private(set) var copyResourceCalls: [CopyResourceCall]
   var copyResourceResponse: Photokit.ResourceCopyResult
@@ -88,6 +90,30 @@ class PhotokitMock: PhotokitProtocol {
       destination: destination
     ))
     return copyResourceResponse
+  }
+
+  public func setAssets(_ assets: [PhotokitAsset]) {
+    self.assets = assets
+  }
+
+  public func setAlbums(_ albums: [PhotokitAlbum]) {
+    self.albums = albums
+  }
+
+  public func setSharedAlbums(_ albums: [PhotokitAlbum]) {
+    self.sharedAlbums = albums
+  }
+
+  public func setRootAlbums(_ albums: [PhotokitAlbum]) {
+    self.rootAlbums = albums
+  }
+
+  public func setRootFolders(_ folders: [PhotokitFolder]) {
+    self.rootFolders = folders
+  }
+
+  public func setResponse(_ res: Photokit.ResourceCopyResult) {
+    self.copyResourceResponse = res
   }
 }
 

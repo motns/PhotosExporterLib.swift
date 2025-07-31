@@ -18,16 +18,16 @@ import Foundation
 import Photos
 import Logging
 
-protocol PhotokitProtocol {
+protocol PhotokitProtocol: Sendable {
   static func authorisePhotos(logger: Logger?) async throws
 
   func getAllAssetsResult() async throws -> any AssetFetchResultProtocol
 
-  func getAssetIdsForAlbumId(albumId: String) throws -> [String]
+  func getAssetIdsForAlbumId(albumId: String) async throws -> [String]
 
-  func getRootFolder() throws -> PhotokitFolder
+  func getRootFolder() async throws -> PhotokitFolder
 
-  func getSharedAlbums() throws -> [PhotokitAlbum]
+  func getSharedAlbums() async throws -> [PhotokitAlbum]
 
   func copyResource(
     assetId: String,
@@ -110,9 +110,9 @@ struct Photokit: PhotokitProtocol {
     allAssetsFetch.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
     // allAssetsFetch.fetchLimit = 25
 
-    var fetchResults = [PhotokitFetchResult<PHAsset, PhotokitAsset>]()
+    var fetchResults = [AssetFetchResult]()
 
-    fetchResults.append(PhotokitFetchResult(PHAsset.fetchAssets(with: allAssetsFetch)) { asset in
+    fetchResults.append(AssetFetchResult(PHAsset.fetchAssets(with: allAssetsFetch)) { asset in
       if let photokitAsset = try await self.getPhotokitAssetForPHAsset(
         asset: asset,
         library: .personalLibrary
@@ -128,7 +128,7 @@ struct Photokit: PhotokitProtocol {
       subtype: .albumCloudShared,
       options: nil
     )) {
-      fetchResults.append(PhotokitFetchResult(
+      fetchResults.append(AssetFetchResult(
         PHAsset.fetchAssets(in: sharedAlbum, options: allAssetsFetch)
       ) { asset in
         if let photokitAsset = try await self.getPhotokitAssetForPHAsset(

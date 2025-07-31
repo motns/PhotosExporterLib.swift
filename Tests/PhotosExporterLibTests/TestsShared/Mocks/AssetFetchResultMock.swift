@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 @testable import PhotosExporterLib
 
-class AssetFetchResultMock: AssetFetchResultProtocol {
+actor AssetFetchResultMock: AssetFetchResultProtocol {
   private var elements: [PhotokitAsset]
   private var index: Int
   public let count: Int

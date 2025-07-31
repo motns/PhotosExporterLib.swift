@@ -45,7 +45,7 @@ final class PhotosExporterLibLiveTests {
 
     try await PhotosExporterLib.authorisePhotos()
 
-    self.photosExporterLib = try PhotosExporterLib.create(
+    self.photosExporterLib = try await PhotosExporterLib.create(
       exportBaseDir: testDir,
       logger: logger,
     )
@@ -59,6 +59,15 @@ final class PhotosExporterLibLiveTests {
 
   @Test("Export")
   func export() async throws {
+    var initialRes = PhotosExporterLib.Result.empty()
+    for try await exporterStatus in photosExporterLib.export() {
+      switch exporterStatus.status {
+      case .complete(let res):
+        initialRes = res
+      default: break
+      }
+    }
+
     let expectedInitialRes = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
         assetInserted: 8,
@@ -73,6 +82,7 @@ final class PhotosExporterLibLiveTests {
         fileSkipped: 0,
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
+        runTime: initialRes.assetExport.runTime,
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: 1,
@@ -83,11 +93,16 @@ final class PhotosExporterLibLiveTests {
         albumUpdated: 0,
         albumUnchanged: 0,
         albumDeleted: 0,
+        runTime: initialRes.collectionExport.runTime,
       ),
-      fileExport: FileExporterResult(copied: 8, deleted: 0)
+      fileExport: FileExporterResult(
+        copied: 8,
+        deleted: 0,
+        runTime: initialRes.fileExport.runTime,
+      ),
+      runTime: initialRes.runTime,
     )
 
-    let initialRes = try await photosExporterLib.export()
     #expect(initialRes == expectedInitialRes)
 
     // TODO - check actual DB contents here

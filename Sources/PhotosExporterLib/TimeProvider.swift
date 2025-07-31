@@ -16,12 +16,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 import Foundation
 
-public protocol TimeProvider {
-  func getDate() -> Date
-  func secondsPassedSince(_ start: Date) -> TimeInterval
+public protocol TimeProvider: Sendable {
+  func getDate() async -> Date
+  func secondsPassedSince(_ start: Date) async -> TimeInterval
 }
 
-struct DefaultTimeProvider: TimeProvider {
+actor DefaultTimeProvider: TimeProvider {
   static let shared = DefaultTimeProvider()
 
   private init() {}

@@ -19,9 +19,9 @@ import Foundation
 import Logging
 import GRDB
 
-protocol PhotosDBProtocol {
-  func getAllAssetScoresById() throws -> [String: Int64]
-  func getAllAssetLocationsById() throws -> [String: PhotosDB.PostalAddress]
+protocol PhotosDBProtocol: Sendable {
+  func getAllAssetScoresById() async throws -> [String: Int64]
+  func getAllAssetLocationsById() async throws -> [String: PhotosDB.PostalAddress]
 }
 
 struct PhotosDB: PhotosDBProtocol {

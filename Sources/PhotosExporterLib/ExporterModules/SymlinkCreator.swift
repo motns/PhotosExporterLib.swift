@@ -18,8 +18,6 @@ import Foundation
 import Logging
 
 struct SymlinkCreator {
-  public let runStatus: SymlinkCreatorStatus
-
   private let albumsDirURL: URL
   private let filesDirURL: URL
   private let locationsDirURL: URL
@@ -45,7 +43,6 @@ struct SymlinkCreator {
     timeProvider: TimeProvider,
     logger: Logger,
   ) {
-    self.runStatus = SymlinkCreatorStatus()
     self.albumsDirURL = albumsDirURL
     self.filesDirURL = filesDirURL
     self.locationsDirURL = locationsDirURL
@@ -57,59 +54,72 @@ struct SymlinkCreator {
     self.logger = ClassLogger(className: "SymlinkCreator", logger: logger)
   }
 
-  func create(isEnabled: Bool = true) throws {
-    guard isEnabled else {
-      logger.warning("Symlink creator disabled - skipping")
-      runStatus.skipped()
-      return
-    }
+  func create(isEnabled: Bool = true) -> AsyncThrowingStream<
+    TaskStatus<EmptyTaskSuccess>,
+    Swift.Error
+  > {
+    return AsyncThrowingStream(
+      bufferingPolicy: .bufferingNewest(1)
+    ) { continuation in
+      Task {
+        guard isEnabled else {
+          logger.warning("Symlink creator disabled - skipping")
+          continuation.yield(.skipped)
+          continuation.finish()
+          return
+        }
 
-    do {
-      logger.info("Removing and recreating symlink folders...")
-      runStatus.start()
-      let startDate = timeProvider.getDate()
+        do {
+          logger.info("Removing and recreating symlink folders...")
+          continuation.yield(.running(nil))
+          let startDate = await timeProvider.getDate()
 
-      _ = try fileManager.remove(url: albumsDirURL)
-      _ = try fileManager.createDirectory(url: albumsDirURL)
+          _ = try await fileManager.remove(url: albumsDirURL)
+          _ = try await fileManager.createDirectory(url: albumsDirURL)
 
-      logger.debug("Creating Album directories and symlinks...")
-      try createAlbumFolderSymlinks(
-        folderId: Photokit.RootFolderId,
-        folderDirURL: albumsDirURL,
-      )
+          logger.debug("Creating Album directories and symlinks...")
+          try await createAlbumFolderSymlinks(
+            folderId: Photokit.RootFolderId,
+            folderDirURL: albumsDirURL,
+          )
 
-      logger.debug("Creating location symlinks...")
-      try createLocationSymlinks()
+          logger.debug("Creating location symlinks...")
+          try await createLocationSymlinks()
 
-      logger.debug("Creating top shot symlinks...")
-      try createTopShotsSymlinks()
+          logger.debug("Creating top shot symlinks...")
+          try await createTopShotsSymlinks()
 
-      let runTime = timeProvider.secondsPassedSince(startDate)
-      logger.info("Symlink folders created in \(runTime)s")
-      runStatus.complete(runTime: runTime)
-    } catch {
-      runStatus.failed(error: "\(error)")
-      throw Error.unexpectedError("\(error)")
+          let runTime = await timeProvider.secondsPassedSince(startDate)
+          logger.info("Symlink folders created in \(runTime)s")
+          continuation.yield(.complete(
+            EmptyTaskSuccess(runTime: runTime)
+          ))
+          continuation.finish()
+        } catch {
+          continuation.yield(.failed("\(error)"))
+          continuation.finish(throwing: Error.unexpectedError("\(error)"))
+        }
+      }
     }
   }
 
-  private func createAlbumFolderSymlinks(folderId: String, folderDirURL: URL) throws {
+  private func createAlbumFolderSymlinks(folderId: String, folderDirURL: URL) async throws {
     logger.debug("Creating symlinks and directories for Folder...", [
       "folder_id": "\(folderId)",
       "folder_dir": "\(folderDirURL)",
     ])
 
     let subfolders = try exporterDB.getFoldersWithParent(parentId: folderId)
-    try createSubfolderSymlinks(subfolders: subfolders, folderDirURL: folderDirURL)
+    try await createSubfolderSymlinks(subfolders: subfolders, folderDirURL: folderDirURL)
 
     let albums = try exporterDB.getAlbumsInFolder(folderId: folderId)
-    try createAlbumSymlinks(albums: albums, folderDirURL: folderDirURL)
+    try await createAlbumSymlinks(albums: albums, folderDirURL: folderDirURL)
   }
 
   private func createSubfolderSymlinks(
     subfolders: [ExportedFolder],
     folderDirURL: URL,
-  ) throws {
+  ) async throws {
     for subfolder in subfolders {
       let pathSafeName = FileHelper.normaliseForPath(subfolder.name)
 
@@ -120,9 +130,9 @@ struct SymlinkCreator {
           "folder_id": "\(subfolder.id)",
           "folder_dir": "\(subfolderDirURL.path(percentEncoded: false))",
         ])
-        _ = try fileManager.createDirectory(url: subfolderDirURL)
+        _ = try await fileManager.createDirectory(url: subfolderDirURL)
 
-        try createAlbumFolderSymlinks(
+        try await createAlbumFolderSymlinks(
           folderId: subfolder.id,
           folderDirURL: subfolderDirURL,
         )
@@ -138,7 +148,7 @@ struct SymlinkCreator {
   private func createAlbumSymlinks(
     albums: [ExportedAlbum],
     folderDirURL: URL,
-  ) throws {
+  ) async throws {
     for album in albums {
       let pathSafeName = FileHelper.normaliseForPath(album.name)
 
@@ -148,7 +158,7 @@ struct SymlinkCreator {
           "album_id": "\(album.id)",
           "album_dir": "\(albumDirURL.path(percentEncoded: false))",
         ])
-        _ = try fileManager.createDirectory(url: albumDirURL)
+        _ = try await fileManager.createDirectory(url: albumDirURL)
 
         for file in try exporterDB.getFilesForAlbum(albumId: album.id) {
           let linkSrc = filesDirURL
@@ -156,7 +166,7 @@ struct SymlinkCreator {
             .appending(path: file.id)
           let linkDest = albumDirURL.appending(path: file.id)
 
-          let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
+          let res = try await fileManager.createSymlink(src: linkSrc, dest: linkDest)
           if res == .exists {
             logger.trace("Symlink for Album File already exists", [
               "album_id": "\(album.id)",
@@ -180,7 +190,7 @@ struct SymlinkCreator {
     }
   }
 
-  private func createLocationSymlinks() throws {
+  private func createLocationSymlinks() async throws {
     let filesWithLocation = try exporterDB.getFilesWithLocation()
 
     for fileWithLocation in filesWithLocation {
@@ -205,14 +215,14 @@ struct SymlinkCreator {
         .appending(path: DateHelper.getYearStr(fileWithLocation.createdAt))
         .appending(path: DateHelper.getYearMonthStr(fileWithLocation.createdAt))
 
-      _ = try fileManager.createDirectory(url: dirURL)
+      _ = try await fileManager.createDirectory(url: dirURL)
 
       let linkSrc = filesDirURL
         .appending(path: file.importedFileDir)
         .appending(path: file.id)
       let linkDest = dirURL.appending(path: file.id)
 
-      let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
+      let res = try await fileManager.createSymlink(src: linkSrc, dest: linkDest)
       if res == .exists {
         logger.trace("Symlink for file at geolocation already exists", [
           "file_id": "\(file.id)",
@@ -229,9 +239,9 @@ struct SymlinkCreator {
     }
   }
 
-  private func createTopShotsSymlinks() throws {
+  private func createTopShotsSymlinks() async throws {
     let filesWithScore = try exporterDB.getFilesWithScore(threshold: scoreThreshold)
-    _ = try fileManager.createDirectory(url: topShotsDirURL)
+    _ = try await fileManager.createDirectory(url: topShotsDirURL)
 
     for fileWithScore in filesWithScore {
       let file = fileWithScore.exportedFile
@@ -244,7 +254,7 @@ struct SymlinkCreator {
         .appending(path: file.id)
       let linkDest = topShotsDirURL.appending(path: "\(fileWithScore.score)-\(file.id)")
 
-      let res = try fileManager.createSymlink(src: linkSrc, dest: linkDest)
+      let res = try await fileManager.createSymlink(src: linkSrc, dest: linkDest)
       if res == .exists {
         logger.trace("Symlink for file with score already exists", [
           "file_id": "\(file.id)",
@@ -261,8 +271,3 @@ struct SymlinkCreator {
     }
   }
 }
-
-// We can't make this a nested type, because then we would have to
-// make `SymlinkCreator` public
-@Observable
-public class SymlinkCreatorStatus: PhotosExporterLib.RunStatus {}

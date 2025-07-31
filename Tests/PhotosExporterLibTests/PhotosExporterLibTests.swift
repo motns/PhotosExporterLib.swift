@@ -38,6 +38,7 @@ final class PhotosExporterLibTests {
   init() async throws {
     var logger = Logger(label: "io.motns.testing")
     logger.logLevel = .critical
+    // logger.logLevel = .trace
     self.testDir = try TestHelpers.createTestDir()
 
     self.photokitMock = PhotokitMock()
@@ -74,7 +75,7 @@ final class PhotosExporterLibTests {
   // swiftlint:disable:next function_body_length
   func exportIntoEmptyDB() async throws {
     // - MARK: Set up test data
-    let startTime = timeProvider.freezeTime().getDate()
+    let startTime = await timeProvider.freezeTime().getDate()
     let exportBaseDir = testDir
 
     let resource1 = dataGen.createPhotokitAssetResource()
@@ -92,18 +93,18 @@ final class PhotosExporterLibTests {
       resources: [resource3],
     )
 
-    photokitMock.assets = [asset1, asset2, asset3]
+    await photokitMock.setAssets([asset1, asset2, asset3])
 
-    photosDBMock.assetLocations = [
+    await photosDBMock.setAssetLocations([
       asset1.id: dataGen.createPostalAddress(country: "United Kingdom", city: "London"),
       asset2.id: dataGen.createPostalAddress(country: "Spain", city: "Madrid"),
       // asset3 won't have location data
-    ]
+    ])
 
-    photosDBMock.assetScores = [
+    await photosDBMock.setAssetScores([
       asset1.id: 902561736,
       asset2.id: 0,
-    ]
+    ])
 
     let album1 = dataGen.createPhotokitAlbum(
       collectionSubtype: .albumCloudShared,
@@ -117,9 +118,9 @@ final class PhotosExporterLibTests {
       subfolders: [folder2],
       albums: [album2],
     )
-    photokitMock.rootAlbums = [album1]
-    photokitMock.rootFolders = [folder1]
-    photokitMock.albums = [album1, album2, album3]
+    await photokitMock.setRootAlbums([album1])
+    await photokitMock.setRootFolders([folder1])
+    await photokitMock.setAlbums([album1, album2, album3])
 
     // - MARK: Create expected models
     let exportedAsset1 = ExportedAsset.fromPhotokitAsset(
@@ -131,8 +132,8 @@ final class PhotosExporterLibTests {
       asset: asset1,
       resource: asset1.resources[0],
       now: startTime,
-      countryId: try countryLookup.getIdByName(name: "United Kingdom"),
-      cityId: try cityLookup.getIdByName(name: "London"),
+      countryId: try await countryLookup.getIdByName(name: "United Kingdom"),
+      cityId: try await cityLookup.getIdByName(name: "London"),
       country: "United Kingdom",
       city: "London",
     )!.copy(wasCopied: true)
@@ -152,8 +153,8 @@ final class PhotosExporterLibTests {
       asset: asset2,
       resource: asset2.resources[0],
       now: startTime,
-      countryId: try countryLookup.getIdByName(name: "Spain"),
-      cityId: try cityLookup.getIdByName(name: "Madrid"),
+      countryId: try await countryLookup.getIdByName(name: "Spain"),
+      cityId: try await cityLookup.getIdByName(name: "Madrid"),
       country: "Spain",
       city: "Madrid",
     )!.copy(wasCopied: true)
@@ -237,6 +238,16 @@ final class PhotosExporterLibTests {
       exportedAlbum3,
     ].sorted(by: { $0.id < $1.id })
 
+    // - MARK: Initial run
+    var initialRes = PhotosExporterLib.Result.empty()
+    for try await exporterStatus in photosExporterLib.export() {
+      switch exporterStatus.status {
+      case .complete(let res):
+        initialRes = res
+      default: break
+      }
+    }
+
     let expectedInitialRes = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
         assetInserted: 3,
@@ -251,6 +262,7 @@ final class PhotosExporterLibTests {
         fileSkipped: 0,
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
+        runTime: initialRes.assetExport.runTime,
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: 3,
@@ -261,12 +273,16 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
         albumDeleted: 0,
+        runTime: initialRes.collectionExport.runTime,
       ),
-      fileExport: FileExporterResult(copied: 3, deleted: 0)
+      fileExport: FileExporterResult(
+        copied: 3,
+        deleted: 0,
+        runTime: initialRes.fileExport.runTime,
+      ),
+      runTime: initialRes.runTime,
     )
 
-    // - MARK: Initial run
-    let initialRes = try await photosExporterLib.export()
     #expect(
       initialRes == expectedInitialRes,
       "\(initialRes.diff(expectedInitialRes).prettyDescription)"
@@ -302,7 +318,7 @@ final class PhotosExporterLibTests {
             .appending(path: exportedFile3.id),
       ),
     ].sorted(by: { $0.assetId < $1.assetId })
-    let sortedMockCopyCalls = self.photokitMock.copyResourceCalls
+    let sortedMockCopyCalls = await self.photokitMock.copyResourceCalls
       .sorted(by: { $0.assetId < $1.assetId })
     #expect(
       sortedMockCopyCalls == expectedCopyCalls,
@@ -375,7 +391,7 @@ final class PhotosExporterLibTests {
           ),
       ),
     ].sorted(by: { $0.dest.absoluteString < $1.dest.absoluteString })
-    let sortedMockSymlinkCalls = fileManagerMock
+    let sortedMockSymlinkCalls = await fileManagerMock
       .createSymlinkCalls.sorted(by: { $0.dest.absoluteString < $1.dest.absoluteString })
     #expect(
       sortedMockSymlinkCalls == expectedSymlinkCalls,
@@ -415,7 +431,7 @@ final class PhotosExporterLibTests {
     let historyEntryInDBInitial = try photosExporterLib.lastRun()
     let expectedHistoryEntryInitial = HistoryEntry(
       id: historyEntryInDBInitial!.id,
-      createdAt: timeProvider.getDate(),
+      createdAt: await timeProvider.getDate(),
       exportResult: expectedInitialRes,
       assetCount: 3,
       fileCount: 3,
@@ -431,7 +447,16 @@ final class PhotosExporterLibTests {
     )
 
     // - MARK: No change run
-    _ = timeProvider.advanceTime(hours: 2)
+    _ = await timeProvider.advanceTime(hours: 2)
+
+    var noChangeRes = PhotosExporterLib.Result.empty()
+    for try await exporterStatus in photosExporterLib.export() {
+      switch exporterStatus.status {
+      case .complete(let res):
+        noChangeRes = res
+      default: break
+      }
+    }
 
     let expectedNoChangeRes = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
@@ -447,6 +472,7 @@ final class PhotosExporterLibTests {
         fileSkipped: 0,
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
+        runTime: noChangeRes.assetExport.runTime,
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: 0,
@@ -457,40 +483,46 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 3,
         albumDeleted: 0,
+        runTime: noChangeRes.collectionExport.runTime,
       ),
-      fileExport: FileExporterResult(copied: 0, deleted: 0)
+      fileExport: FileExporterResult(
+        copied: 0,
+        deleted: 0,
+        runTime: noChangeRes.fileExport.runTime,
+      ),
+      runTime: noChangeRes.runTime,
     )
-    let noChangeRes = try await photosExporterLib.export()
+
     #expect(
       noChangeRes == expectedNoChangeRes,
       "\(noChangeRes.diff(expectedNoChangeRes).prettyDescription)"
     )
     // Make sure no new file copy calls have happened
-    #expect(photokitMock.copyResourceCalls.count == 3)
+    #expect(await photokitMock.copyResourceCalls.count == 3)
 
     // - MARK: Update run
-    _ = timeProvider.advanceTime(hours: 2)
+    _ = await timeProvider.advanceTime(hours: 2)
 
     let updatedAsset1 = asset1.copy(
       isFavourite: !asset1.isFavourite
     )
-    photokitMock.assets = [updatedAsset1, asset2, asset3]
+    await photokitMock.setAssets([updatedAsset1, asset2, asset3])
 
-    photosDBMock.assetLocations = [
+    await photosDBMock.setAssetLocations([
       asset1.id: dataGen.createPostalAddress(country: "United Kingdom", city: "London"),
       asset2.id: dataGen.createPostalAddress(country: "Hungary", city: "Budapest"),
-    ]
+    ])
 
-    photosDBMock.assetScores = [
+    await photosDBMock.setAssetScores([
       asset1.id: 808547258,
       asset2.id: 0,
-    ]
+    ])
 
     let updatedAlbum1 = album1.copy(
       assetIds: [asset1.id, asset2.id]
     )
-    photokitMock.rootAlbums = [updatedAlbum1]
-    photokitMock.albums = [updatedAlbum1, album2, album3]
+    await photokitMock.setRootAlbums([updatedAlbum1])
+    await photokitMock.setAlbums([updatedAlbum1, album2, album3])
 
     let updatedExportedAsset1 = ExportedAsset.fromPhotokitAsset(
       asset: updatedAsset1,
@@ -507,8 +539,8 @@ final class PhotosExporterLibTests {
       asset: asset2,
       resource: asset2.resources[0],
       now: startTime,
-      countryId: try countryLookup.getIdByName(name: "Hungary"),
-      cityId: try cityLookup.getIdByName(name: "Budapest"),
+      countryId: try await countryLookup.getIdByName(name: "Hungary"),
+      cityId: try await cityLookup.getIdByName(name: "Budapest"),
       country: "Hungary",
       city: "Budapest",
     )!.copy(wasCopied: true)
@@ -534,6 +566,15 @@ final class PhotosExporterLibTests {
       exportedAlbum3,
     ].sorted(by: { $0.id < $1.id })
 
+    var updateRes = PhotosExporterLib.Result.empty()
+    for try await exporterStatus in photosExporterLib.export() {
+      switch exporterStatus.status {
+      case .complete(let res):
+        updateRes = res
+      default: break
+      }
+    }
+
     let expectedUpdateRes = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
         assetInserted: 0,
@@ -548,6 +589,7 @@ final class PhotosExporterLibTests {
         fileSkipped: 0,
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
+        runTime: updateRes.assetExport.runTime,
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: 0,
@@ -558,10 +600,16 @@ final class PhotosExporterLibTests {
         albumUpdated: 1,
         albumUnchanged: 2,
         albumDeleted: 0,
+        runTime: updateRes.collectionExport.runTime,
       ),
-      fileExport: FileExporterResult(copied: 1, deleted: 0)
+      fileExport: FileExporterResult(
+        copied: 1,
+        deleted: 0,
+        runTime: updateRes.fileExport.runTime,
+      ),
+      runTime: updateRes.runTime,
     )
-    let updateRes = try await photosExporterLib.export()
+
     #expect(
       updateRes == expectedUpdateRes,
       "\(updateRes.diff(expectedUpdateRes).prettyDescription)"
@@ -595,9 +643,9 @@ final class PhotosExporterLibTests {
 
   // - MARK: Expire and Delete test
   @Test("Expire and Delete Assets and Files")
-  // swiftlint:disable:next function_body_length
+  // swiftlint:disable:next function_body_length cyclomatic_complexity
   func expireAndDeleteAssetsAndFiles() async throws {
-    let now = timeProvider.setTime(timeStr: "2025-04-05 12:05:30").getDate()
+    let now = await timeProvider.setTime(timeStr: "2025-04-05 12:05:30").getDate()
     let exportBaseDir = testDir
 
     // These will stay as-is
@@ -625,12 +673,12 @@ final class PhotosExporterLibTests {
     )
     // Fifth Asset has already been deleted
 
-    photokitMock.assets = [
+    await photokitMock.setAssets([
       asset1,
       asset2,
       assetToDeleteLater,
       asset3,
-    ]
+    ])
 
     let exportedAsset1 = try dataGen.createAndSaveExportedAsset(
       photokitAsset: asset1,
@@ -770,6 +818,15 @@ final class PhotosExporterLibTests {
     ].sorted { $0.fileId < $1.fileId }
 
     // - MARK: First run - mark for deletion
+    var markRes = PhotosExporterLib.Result.empty()
+    for try await exporterStatus in photosExporterLib.export() {
+      switch exporterStatus.status {
+      case .complete(let res):
+        markRes = res
+      default: break
+      }
+    }
+
     let expectedMarkRes = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
         assetInserted: 0,
@@ -784,6 +841,7 @@ final class PhotosExporterLibTests {
         fileSkipped: 0,
         fileMarkedForDeletion: 2,
         fileDeleted: 0,
+        runTime: markRes.assetExport.runTime,
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: 1,
@@ -794,11 +852,16 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
         albumDeleted: 0,
+        runTime: markRes.collectionExport.runTime,
       ),
-      fileExport: FileExporterResult(copied: 0, deleted: 0)
+      fileExport: FileExporterResult(
+        copied: 0,
+        deleted: 0,
+        runTime: markRes.fileExport.runTime,
+      ),
+      runTime: markRes.runTime,
     )
 
-    let markRes = try await photosExporterLib.export()
     #expect(
       markRes == expectedMarkRes,
       "\(markRes.diff(expectedMarkRes).prettyDescription)"
@@ -825,7 +888,7 @@ final class PhotosExporterLibTests {
     let historyEntryInDBMark = try photosExporterLib.lastRun()
     let expectedHistoryEntryMark = HistoryEntry(
       id: historyEntryInDBMark!.id,
-      createdAt: timeProvider.getDate(),
+      createdAt: await timeProvider.getDate(),
       exportResult: markRes,
       assetCount: 5,
       fileCount: 7,
@@ -841,7 +904,17 @@ final class PhotosExporterLibTests {
     )
 
     // - MARK: Second run - no changes
-    _ = timeProvider.advanceTime(minutes: 10)
+    _ = await timeProvider.advanceTime(minutes: 10)
+
+    var noChangeRes = PhotosExporterLib.Result.empty()
+    for try await exporterStatus in photosExporterLib.export() {
+      switch exporterStatus.status {
+      case .complete(let res):
+        noChangeRes = res
+      default: break
+      }
+    }
+
     let expectedNoChange = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
         assetInserted: 0,
@@ -856,6 +929,7 @@ final class PhotosExporterLibTests {
         fileSkipped: 0,
         fileMarkedForDeletion: 0,
         fileDeleted: 0,
+        runTime: noChangeRes.assetExport.runTime,
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: 0,
@@ -866,11 +940,16 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
         albumDeleted: 0,
+        runTime: noChangeRes.collectionExport.runTime,
       ),
-      fileExport: FileExporterResult(copied: 0, deleted: 0)
+      fileExport: FileExporterResult(
+        copied: 0,
+        deleted: 0,
+        runTime: noChangeRes.fileExport.runTime,
+      ),
+      runTime: noChangeRes.runTime,
     )
 
-    let noChangeRes = try await photosExporterLib.export()
     #expect(
       noChangeRes == expectedNoChange,
       "\(noChangeRes.diff(expectedNoChange).prettyDescription)"
@@ -879,7 +958,7 @@ final class PhotosExporterLibTests {
     let historyEntryInDBNoChange = try photosExporterLib.lastRun()
     let expectedHistoryEntryNoChange = HistoryEntry(
       id: historyEntryInDBNoChange!.id,
-      createdAt: timeProvider.getDate(),
+      createdAt: await timeProvider.getDate(),
       exportResult: noChangeRes,
       assetCount: 5,
       fileCount: 7,
@@ -895,7 +974,16 @@ final class PhotosExporterLibTests {
     )
 
     // - MARK: Third run - delete expired
-    _ = timeProvider.advanceTime(days: 31)
+    _ = await timeProvider.advanceTime(days: 31)
+
+    var deleteRes = PhotosExporterLib.Result.empty()
+    for try await exporterStatus in photosExporterLib.export() {
+      switch exporterStatus.status {
+      case .complete(let res):
+        deleteRes = res
+      default: break
+      }
+    }
 
     let expectedDelete = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
@@ -911,6 +999,7 @@ final class PhotosExporterLibTests {
         fileSkipped: 0,
         fileMarkedForDeletion: 0,
         fileDeleted: 2,
+        runTime: deleteRes.assetExport.runTime,
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: 0,
@@ -921,10 +1010,16 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
         albumDeleted: 0,
+        runTime: deleteRes.collectionExport.runTime,
       ),
-      fileExport: FileExporterResult(copied: 0, deleted: 2)
+      fileExport: FileExporterResult(
+        copied: 0,
+        deleted: 2,
+        runTime: deleteRes.fileExport.runTime,
+      ),
+      runTime: deleteRes.runTime,
     )
-    let deleteRes = try await photosExporterLib.export()
+
     #expect(
       deleteRes == expectedDelete,
       "\(deleteRes.diff(expectedDelete).prettyDescription)"
@@ -972,7 +1067,7 @@ final class PhotosExporterLibTests {
     let historyEntryInDBDelete = try photosExporterLib.lastRun()
     let expectedHistoryEntryDelete = HistoryEntry(
       id: historyEntryInDBDelete!.id,
-      createdAt: timeProvider.getDate(),
+      createdAt: await timeProvider.getDate(),
       exportResult: deleteRes,
       assetCount: 4,
       fileCount: 5,
@@ -1001,7 +1096,7 @@ final class PhotosExporterLibTests {
       ),
     ].sorted { $0.url.absoluteString < $1.url.absoluteString }
 
-    let sortedFilteredRemoveCalls = fileManagerMock.removeCalls
+    let sortedFilteredRemoveCalls = await fileManagerMock.removeCalls
       .filter {
         // Remove calls will also include the ones made by the
         // Symlink creator Module, so we need to filter those out
@@ -1014,16 +1109,25 @@ final class PhotosExporterLibTests {
     )
 
     // - MARK: Fourth run - second expiry run
-    _ = timeProvider.advanceTime(days: 5)
+    _ = await timeProvider.advanceTime(days: 5)
 
     // Remove one Asset and One Resource from source
-    photokitMock.assets = [
+    await photokitMock.setAssets([
       asset1,
       asset2,
       asset3.copy(
         resources: [resource4],
       ),
-    ]
+    ])
+
+    var markRes2 = PhotosExporterLib.Result.empty()
+    for try await exporterStatus in photosExporterLib.export() {
+      switch exporterStatus.status {
+      case .complete(let res):
+        markRes2 = res
+      default: break
+      }
+    }
 
     let expectedMarkRes2 = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
@@ -1039,6 +1143,7 @@ final class PhotosExporterLibTests {
         fileSkipped: 0,
         fileMarkedForDeletion: 2,
         fileDeleted: 0,
+        runTime: markRes2.assetExport.runTime,
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: 0,
@@ -1049,10 +1154,16 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
         albumDeleted: 0,
+        runTime: markRes2.collectionExport.runTime,
       ),
-      fileExport: FileExporterResult(copied: 0, deleted: 0)
+      fileExport: FileExporterResult(
+        copied: 0,
+        deleted: 0,
+        runTime: markRes2.fileExport.runTime,
+      ),
+      runTime: markRes2.runTime,
     )
-    let markRes2 = try await photosExporterLib.export()
+
     #expect(
       markRes2 == expectedMarkRes2,
       "\(markRes2.diff(expectedMarkRes2).prettyDescription)",
@@ -1061,7 +1172,7 @@ final class PhotosExporterLibTests {
     let historyEntryInDBMark2 = try photosExporterLib.lastRun()
     let expectedHistoryEntryMark2 = HistoryEntry(
       id: historyEntryInDBMark2!.id,
-      createdAt: timeProvider.getDate(),
+      createdAt: await timeProvider.getDate(),
       exportResult: markRes2,
       assetCount: 4,
       fileCount: 5,
@@ -1077,8 +1188,17 @@ final class PhotosExporterLibTests {
     )
 
     // - MARK: Final run - second delete
-    _ = timeProvider.advanceTime(days: 31)
-    fileManagerMock.resetCalls()
+    _ = await timeProvider.advanceTime(days: 31)
+    await fileManagerMock.resetCalls()
+
+    var deleteRes2 = PhotosExporterLib.Result.empty()
+    for try await exporterStatus in photosExporterLib.export() {
+      switch exporterStatus.status {
+      case .complete(let res):
+        deleteRes2 = res
+      default: break
+      }
+    }
 
     let expectedDelete2 = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
@@ -1094,6 +1214,7 @@ final class PhotosExporterLibTests {
         fileSkipped: 0,
         fileMarkedForDeletion: 0,
         fileDeleted: 2,
+        runTime: deleteRes2.assetExport.runTime,
       ),
       collectionExport: CollectionExporterResult(
         folderInserted: 0,
@@ -1104,10 +1225,16 @@ final class PhotosExporterLibTests {
         albumUpdated: 0,
         albumUnchanged: 0,
         albumDeleted: 0,
+        runTime: deleteRes2.collectionExport.runTime,
       ),
-      fileExport: FileExporterResult(copied: 0, deleted: 2)
+      fileExport: FileExporterResult(
+        copied: 0,
+        deleted: 2,
+        runTime: deleteRes2.fileExport.runTime,
+      ),
+      runTime: deleteRes2.runTime,
     )
-    let deleteRes2 = try await photosExporterLib.export()
+
     #expect(
       deleteRes2 == expectedDelete2,
       "\(deleteRes2.diff(expectedDelete2).prettyDescription)"
@@ -1150,7 +1277,7 @@ final class PhotosExporterLibTests {
     let historyEntryInDBDelete2 = try photosExporterLib.lastRun()
     let expectedHistoryEntryDelete2 = HistoryEntry(
       id: historyEntryInDBDelete2!.id,
-      createdAt: timeProvider.getDate(),
+      createdAt: await timeProvider.getDate(),
       exportResult: deleteRes2,
       assetCount: 3,
       fileCount: 3,
@@ -1178,7 +1305,7 @@ final class PhotosExporterLibTests {
       ),
     ].sorted { $0.url.absoluteString < $1.url.absoluteString }
 
-    let sortedFilteredRemoveCalls2 = fileManagerMock.removeCalls
+    let sortedFilteredRemoveCalls2 = await fileManagerMock.removeCalls
       .filter {
         // Remove calls will also include the ones made by the
         // Symlink creator Module, so we need to filter those out

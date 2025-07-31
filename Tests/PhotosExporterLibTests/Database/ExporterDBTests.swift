@@ -829,8 +829,8 @@ final class ExporterDBTests {
   }
 
   @Test("Insert Export Result History Entry")
-  func insertExportResultHistoryEntry() throws {
-    let now = testTimeProvider.getDate()
+  func insertExportResultHistoryEntry() async throws {
+    let now = await testTimeProvider.getDate()
     let entry = dataGen.createExportResultHistoryEntry(now: now)
 
     try exporterDB.insertExportResultHistoryEntry(entry: entry)

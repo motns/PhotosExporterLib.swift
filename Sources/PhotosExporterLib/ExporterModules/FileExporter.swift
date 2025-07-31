@@ -17,9 +17,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import Foundation
 import Logging
 
-struct FileExporter {
-  public let runStatus: FileExporterStatus
+extension Logger: Sendable {}
 
+// swiftlint:disable file_length
+// swiftlint:disable:next type_body_length
+struct FileExporter: Sendable {
   private let filesDirURL: URL
   private let exporterDB: ExporterDB
   private let photokit: PhotokitProtocol
@@ -39,168 +41,330 @@ struct FileExporter {
     timeProvider: TimeProvider,
     logger: Logger,
   ) {
-    self.runStatus = FileExporterStatus()
     self.filesDirURL = filesDirURL
     self.exporterDB = exporterDB
     self.photokit = photokit
     self.fileManager = fileManager
     self.timeProvider = timeProvider
-    self.logger = ClassLogger(className: "FileCopier", logger: logger)
+    self.logger = ClassLogger(className: "FileExporter", logger: logger)
   }
 
-  func run(isEnabled: Bool = false) async throws -> FileExporterResultWithRemoved {
-    guard isEnabled else {
-      logger.warning("File copying and deletion disabled - skipping")
-      runStatus.skipped()
-      return FileExporterResultWithRemoved.empty()
-    }
-    do {
-      runStatus.start()
-      let startDate = timeProvider.getDate()
-      let copyRes = try await copy()
-      let deletedCnt = try delete()
+  // swiftlint:disable:next function_body_length cyclomatic_complexity
+  func run(isEnabled: Bool = false) -> AsyncThrowingStream<
+    FileExporterStatus,
+    Swift.Error
+  > {
+    return AsyncThrowingStream(
+      bufferingPolicy: .bufferingNewest(10)
+    ) { continuation in
+      Task {
+        var status = FileExporterStatus.notStarted()
 
-      let runTime = timeProvider.secondsPassedSince(startDate)
-      logger.info("File copying and deletion complete in \(runTime)s")
-      runStatus.complete(runTime: runTime)
-      return FileExporterResultWithRemoved(
-        result: FileExporterResult(
-          copied: copyRes.result.copied,
-          deleted: deletedCnt,
-        ),
-        fileMarkedForDeletion: copyRes.fileMarkedForDeletion
-      )
-    } catch {
-      runStatus.failed(error: "\(error)")
-      throw Error.unexpectedError("\(error)")
+        guard isEnabled else {
+          logger.warning("File copying and deletion disabled - skipping")
+          status = status.withMainStatus(.skipped)
+          continuation.yield(status)
+          continuation.finish()
+          return
+        }
+
+        status = status.withMainStatus(.running(nil))
+        continuation.yield(status)
+        let startDate = await timeProvider.getDate()
+
+        var copyRes: CopyFileResult = CopyFileResult.empty()
+        do {
+          for try await copyStatus in copy() {
+            switch copyStatus {
+            case .notStarted, .skipped, .cancelled: break
+            case .running:
+              status = status.withCopyStatus(copyStatus)
+              continuation.yield(status)
+            case .failed(let error):
+              status = status.withMainStatus(.failed(error)).withCopyStatus(copyStatus)
+              continuation.yield(status)
+              continuation.finish(throwing: Error.unexpectedError("\(error)"))
+              return
+            case .complete(let result):
+              copyRes = result
+              status = status.withCopyStatus(copyStatus)
+              continuation.yield(status)
+            }
+          }
+        } catch {
+          status = status
+              .withMainStatus(.failed("\(error)"))
+              .withCopyStatus(.failed("\(error)"))
+          continuation.yield(status)
+          continuation.finish(throwing: Error.unexpectedError("\(error)"))
+        }
+
+        do {
+          var deleteRes: DeleteFileResult = DeleteFileResult.empty()
+          for try await deleteStatus in delete() {
+            switch deleteStatus {
+            case .notStarted, .skipped, .cancelled: break
+            case .running:
+              status = status.withDeleteStatus(deleteStatus)
+              continuation.yield(status)
+            case .failed(let error):
+              status = status.withMainStatus(.failed(error)).withDeleteStatus(deleteStatus)
+              continuation.yield(status)
+              continuation.finish(throwing: Error.unexpectedError("\(error)"))
+              return
+            case .complete(let result):
+              deleteRes = result
+              status = status.withDeleteStatus(deleteStatus)
+              continuation.yield(status)
+            }
+          }
+
+          let runTime = await timeProvider.secondsPassedSince(startDate)
+          logger.info("File copying and deletion complete in \(runTime)s")
+          status = status.withMainStatus(
+            .complete(
+              FileExporterResultWithRemoved(
+                result: FileExporterResult(
+                  copied: copyRes.copied,
+                  deleted: deleteRes.deleted,
+                  runTime: runTime,
+                ),
+                fileMarkedForDeletion: copyRes.markedForDeletion,
+                runTime: runTime,
+              )
+            )
+          )
+          continuation.yield(status)
+          continuation.finish()
+        } catch {
+          status = status
+            .withMainStatus(.failed("\(error)"))
+            .withDeleteStatus(.failed("\(error)"))
+          continuation.yield(status)
+          continuation.finish(throwing: Error.unexpectedError("\(error)"))
+        }
+      }
     }
   }
 
   // swiftlint:disable:next function_body_length
-  private func copy() async throws -> FileExporterResultWithRemoved {
-    do {
-      logger.info("Getting Files to copy from local DB...")
-      runStatus.copyStatus.start()
-      let startTime = timeProvider.getDate()
-      let filesWithAssetIdToCopy = try exporterDB.getFilesWithAssetIdsToCopy()
+  private func copy() -> AsyncThrowingStream<
+    TaskStatus<CopyFileResult>,
+    Swift.Error
+  > {
+    AsyncThrowingStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+      Task {
+        var status: TaskStatus<CopyFileResult> = .notStarted
 
-      guard filesWithAssetIdToCopy.count > 0 else {
-        logger.info("No Files to copy")
-        runStatus.copyStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
-        return FileExporterResultWithRemoved.empty()
+        do {
+          guard !Task.isCancelled else {
+            logger.info("File Copy Task cancelled")
+            continuation.yield(.cancelled)
+            continuation.finish()
+            return
+          }
+
+          logger.info("Getting Files to copy from local DB...")
+          status = .running(nil)
+          continuation.yield(status)
+          let startTime = await timeProvider.getDate()
+          let filesWithAssetIdToCopy = try exporterDB.getFilesWithAssetIdsToCopy()
+
+          guard filesWithAssetIdToCopy.count > 0 else {
+            logger.info("No Files to copy")
+            continuation.yield(TaskStatus<CopyFileResult>.complete(
+              CopyFileResult(
+                copied: 0,
+                markedForDeletion: 0,
+                runTime: await timeProvider.secondsPassedSince(startTime),
+              )
+            ))
+            continuation.finish()
+            return
+          }
+
+          logger.info("Copying files...")
+          var progress = TaskProgress(toProcess: filesWithAssetIdToCopy.count)
+          status = .running(progress)
+          continuation.yield(status)
+          var copiedCnt = 0
+          var markedForDeletionCnt = 0
+          for toCopy in filesWithAssetIdToCopy {
+            guard !Task.isCancelled else {
+              logger.info("File Copy Task cancelled")
+              continuation.yield(.cancelled)
+              continuation.finish()
+              return
+            }
+
+            let destinationDirURL = filesDirURL.appending(path: toCopy.exportedFile.importedFileDir)
+            let loggerMetadata: Logger.Metadata = ["id": "\(toCopy.exportedFile.id)"]
+
+            if try await fileManager.createDirectory(path: destinationDirURL.path(percentEncoded: false)) == .success {
+              logger.trace("Created destination directory: \(destinationDirURL.path(percentEncoded: false))")
+            }
+            let destinationFileURL = destinationDirURL.appending(path: toCopy.exportedFile.id)
+
+            let copyResult = try await photokit.copyResource(
+              assetId: toCopy.assetIds.first!,
+              resourceType: PhotokitAssetResourceType.fromExporterFileType(
+                fileType: toCopy.exportedFile.fileType
+              ),
+              originalFileName: toCopy.exportedFile.originalFileName,
+              destination: destinationFileURL
+            )
+
+            if copyResult == .exists {
+              logger.warning("File was already copied but not updated in DB", loggerMetadata)
+            }
+
+            switch copyResult {
+            case .removed:
+              logger.trace("File removed in Photos - marking link as deleted in DB...", loggerMetadata)
+              markedForDeletionCnt += 1
+              _ = try exporterDB.markFileAsDeleted(id: toCopy.exportedFile.id, now: await timeProvider.getDate())
+            case .exists, .copied:
+              logger.trace("File successfully copied - updating DB...", loggerMetadata)
+              copiedCnt += 1
+              _ = try exporterDB.markFileAsCopied(id: toCopy.exportedFile.id)
+            }
+            logger.trace("File updated in DB", loggerMetadata)
+
+            progress = progress.processed()
+            status = .running(progress)
+            continuation.yield(status)
+          }
+
+          continuation.yield(
+            TaskStatus<CopyFileResult>.complete(
+              CopyFileResult(
+                copied: copiedCnt,
+                markedForDeletion: markedForDeletionCnt,
+                runTime: await timeProvider.secondsPassedSince(startTime),
+              )
+            )
+          )
+          continuation.finish()
+        } catch {
+          continuation.yield(
+            TaskStatus<CopyFileResult>.failed("\(error)")
+          )
+          continuation.finish(throwing: error)
+        }
       }
-
-      logger.info("Copying files...")
-      runStatus.copyStatus.startProgress(toProcess: filesWithAssetIdToCopy.count)
-      var copiedCnt = 0
-      var markedForDeletionCnt = 0
-      for toCopy in filesWithAssetIdToCopy {
-        let destinationDirURL = filesDirURL.appending(path: toCopy.exportedFile.importedFileDir)
-        let loggerMetadata: Logger.Metadata = ["id": "\(toCopy.exportedFile.id)"]
-
-        if try fileManager.createDirectory(path: destinationDirURL.path(percentEncoded: false)) == .success {
-          logger.trace("Created destination directory: \(destinationDirURL.path(percentEncoded: false))")
-        }
-        let destinationFileURL = destinationDirURL.appending(path: toCopy.exportedFile.id)
-
-        let copyResult = try await photokit.copyResource(
-          assetId: toCopy.assetIds.first!,
-          resourceType: PhotokitAssetResourceType.fromExporterFileType(
-            fileType: toCopy.exportedFile.fileType
-          ),
-          originalFileName: toCopy.exportedFile.originalFileName,
-          destination: destinationFileURL
-        )
-
-        if copyResult == .exists {
-          logger.warning("File was already copied but not updated in DB", loggerMetadata)
-        }
-
-        switch copyResult {
-        case .removed:
-          logger.trace("File removed in Photos - marking link as deleted in DB...", loggerMetadata)
-          markedForDeletionCnt += 1
-          _ = try exporterDB.markFileAsDeleted(id: toCopy.exportedFile.id, now: timeProvider.getDate())
-        case .exists, .copied:
-          logger.trace("File successfully copied - updating DB...", loggerMetadata)
-          copiedCnt += 1
-          _ = try exporterDB.markFileAsCopied(id: toCopy.exportedFile.id)
-        }
-        logger.trace("File updated in DB", loggerMetadata)
-
-        runStatus.copyStatus.processed()
-      }
-
-      runStatus.copyStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
-      return FileExporterResultWithRemoved(
-        result: FileExporterResult(copied: copiedCnt, deleted: 0),
-        fileMarkedForDeletion: markedForDeletionCnt,
-      )
-    } catch {
-      runStatus.copyStatus.failed(error: "\(error)")
-      throw error
     }
   }
 
-  private func delete() throws -> Int {
-    do {
-      logger.debug("Checking for orphaned Files to delete...")
-      let startTime = timeProvider.getDate()
-      runStatus.deleteStatus.start()
-      let orphanedFiles = try exporterDB.getOrphanedFiles()
+  // swiftlint:disable:next function_body_length
+  private func delete() -> AsyncThrowingStream<
+    TaskStatus<DeleteFileResult>,
+    Swift.Error
+  > {
+    return AsyncThrowingStream { continuation in
+      Task {
+        var status: TaskStatus<DeleteFileResult> = .notStarted
 
-      guard !orphanedFiles.isEmpty else {
-        logger.debug("No orphaned files to delete")
-        runStatus.deleteStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
-        return 0
+        do {
+          guard !Task.isCancelled else {
+            logger.info("File Delete Task cancelled")
+            continuation.yield(.cancelled)
+            continuation.finish()
+            return
+          }
+
+          logger.debug("Checking for orphaned Files to delete...")
+          let startTime = await timeProvider.getDate()
+          status = .running(nil)
+          continuation.yield(status)
+          let orphanedFiles = try exporterDB.getOrphanedFiles()
+
+          guard !orphanedFiles.isEmpty else {
+            logger.debug("No orphaned files to delete")
+            continuation.yield(TaskStatus<DeleteFileResult>.complete(
+              DeleteFileResult(
+                deleted: 0,
+                runTime: await timeProvider.secondsPassedSince(startTime),
+              )
+            ))
+            continuation.finish()
+            return
+          }
+          logger.debug("Found \(orphanedFiles.count) orphaned Files to delete...")
+          var progress = TaskProgress(toProcess: orphanedFiles.count)
+          status = .running(progress)
+          continuation.yield(status)
+
+          for file in orphanedFiles {
+            guard !Task.isCancelled else {
+              logger.info("File Delete Task cancelled")
+              continuation.yield(.cancelled)
+              continuation.finish()
+              return
+            }
+
+            let fileUrl = filesDirURL
+              .appending(path: file.importedFileDir)
+              .appending(path: file.id)
+
+            let logMetadata: Logger.Metadata = [
+              "id": "\(file.id)",
+              "path": "\(fileUrl.absoluteString)",
+            ]
+
+            logger.debug("Deleting underlying file for Exported File...", logMetadata)
+            _ = try await fileManager.remove(url: fileUrl)
+
+            logger.debug("Deleting Exported File from DB...", logMetadata)
+            _ = try exporterDB.deleteFile(id: file.id)
+            progress = progress.processed()
+            status = .running(progress)
+            continuation.yield(status)
+          }
+
+          continuation.yield(
+            TaskStatus<DeleteFileResult>.complete(
+              DeleteFileResult(
+                deleted: orphanedFiles.count,
+                runTime: await timeProvider.secondsPassedSince(startTime),
+              )
+            )
+          )
+          continuation.finish()
+        } catch {
+          continuation.yield(
+            TaskStatus<DeleteFileResult>.failed("\(error)")
+          )
+          continuation.finish(throwing: error)
+        }
       }
-      logger.debug("Found \(orphanedFiles.count) orphaned Files to delete...")
-      runStatus.deleteStatus.startProgress(toProcess: orphanedFiles.count)
-
-      for file in orphanedFiles {
-        let fileUrl = filesDirURL
-          .appending(path: file.importedFileDir)
-          .appending(path: file.id)
-
-        let logMetadata: Logger.Metadata = [
-          "id": "\(file.id)",
-          "path": "\(fileUrl.absoluteString)",
-        ]
-
-        logger.debug("Deleting underlying file for Exported File...", logMetadata)
-        _ = try fileManager.remove(url: fileUrl)
-
-        logger.debug("Deleting Exported File from DB...", logMetadata)
-        _ = try exporterDB.deleteFile(id: file.id)
-        runStatus.deleteStatus.processed()
-      }
-
-      runStatus.deleteStatus.complete(runTime: timeProvider.secondsPassedSince(startTime))
-      return orphanedFiles.count
-    } catch {
-      runStatus.deleteStatus.failed(error: "\(error)")
-      throw error
     }
   }
 }
 
-public struct FileExporterResult: Codable, Sendable, Equatable {
-  let copied: Int
-  let deleted: Int
+public struct FileExporterResult: Codable, Sendable, Equatable, Timeable {
+  public let copied: Int
+  public let deleted: Int
+  public let runTime: Double
 
   static func empty() -> FileExporterResult {
-    return FileExporterResult(copied: 0, deleted: 0)
+    return FileExporterResult(
+      copied: 0,
+      deleted: 0,
+      runTime: 0,
+    )
   }
 }
 
-public struct FileExporterResultWithRemoved {
-  let result: FileExporterResult
-  let fileMarkedForDeletion: Int
+public struct FileExporterResultWithRemoved: Sendable, Timeable {
+  public let result: FileExporterResult
+  public let fileMarkedForDeletion: Int
+  public let runTime: Double
 
   static func empty() -> FileExporterResultWithRemoved {
     return FileExporterResultWithRemoved(
       result: FileExporterResult.empty(),
       fileMarkedForDeletion: 0,
+      runTime: 0,
     )
   }
 }
@@ -210,6 +374,7 @@ extension FileExporterResult: DiffableStruct {
     return StructDiff()
       .add(diffProperty(other, \.copied))
       .add(diffProperty(other, \.deleted))
+      .add(diffProperty(other, \.runTime))
   }
 }
 
@@ -218,19 +383,69 @@ extension FileExporterResultWithRemoved: DiffableStruct {
     return StructDiff()
       .add(diffProperty(other, \.result))
       .add(diffProperty(other, \.fileMarkedForDeletion))
+      .add(diffProperty(other, \.runTime))
   }
 }
 
-@Observable
-public class FileExporterStatus: PhotosExporterLib.RunStatus {
-  public let copyStatus: PhotosExporterLib.RunStatusWithProgress
-  public let deleteStatus: PhotosExporterLib.RunStatusWithProgress
+public struct CopyFileResult: Sendable, Timeable {
+  public let copied: Int
+  public let markedForDeletion: Int
+  public let runTime: Double
 
-  public init(
-    copyStatus: PhotosExporterLib.RunStatusWithProgress? = nil,
-    deleteStatus: PhotosExporterLib.RunStatusWithProgress? = nil,
-  ) {
-    self.copyStatus = copyStatus ?? PhotosExporterLib.RunStatusWithProgress()
-    self.deleteStatus = deleteStatus ?? PhotosExporterLib.RunStatusWithProgress()
+  static func empty() -> CopyFileResult {
+    return CopyFileResult(copied: 0, markedForDeletion: 0, runTime: 0)
+  }
+}
+
+public struct DeleteFileResult: Sendable, Timeable {
+  public let deleted: Int
+  public let runTime: Double
+
+  static func empty() -> DeleteFileResult {
+    return DeleteFileResult(deleted: 0, runTime: 0)
+  }
+}
+
+public struct FileExporterStatus: Sendable {
+  public let status: TaskStatus<FileExporterResultWithRemoved>
+  public let copyStatus: TaskStatus<CopyFileResult>
+  public let deleteStatus: TaskStatus<DeleteFileResult>
+
+  static func notStarted() -> FileExporterStatus {
+    return FileExporterStatus(
+      status: .notStarted,
+      copyStatus: .notStarted,
+      deleteStatus: .notStarted
+    )
+  }
+
+  func copy(
+    status: TaskStatus<FileExporterResultWithRemoved>? = nil,
+    copyStatus: TaskStatus<CopyFileResult>? = nil,
+    deleteStatus: TaskStatus<DeleteFileResult>? = nil,
+  ) -> FileExporterStatus {
+    return FileExporterStatus(
+      status: status ?? self.status,
+      copyStatus: copyStatus ?? self.copyStatus,
+      deleteStatus: deleteStatus ?? self.deleteStatus,
+    )
+  }
+
+  func withMainStatus(_ newStatus: TaskStatus<FileExporterResultWithRemoved>) -> FileExporterStatus {
+    return copy(
+      status: newStatus,
+    )
+  }
+
+  func withCopyStatus(_ newStatus: TaskStatus<CopyFileResult>) -> FileExporterStatus {
+    return copy(
+      copyStatus: newStatus,
+    )
+  }
+
+  func withDeleteStatus(_ newStatus: TaskStatus<DeleteFileResult>) -> FileExporterStatus {
+    return copy(
+      deleteStatus: newStatus,
+    )
   }
 }

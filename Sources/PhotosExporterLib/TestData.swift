@@ -15,9 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+/*
 public enum TestData {
-  public enum RunStatus {
-    public static func notStarted() -> PhotosExporterLib.RunStatus {
+  public enum TaskStatus {
+    public static func notStarted() -> PhotosExporterLib.Status {
       return PhotosExporterLib.RunStatus()
     }
 
@@ -190,3 +191,4 @@ public enum TestData {
     }
   }
 }
+*/

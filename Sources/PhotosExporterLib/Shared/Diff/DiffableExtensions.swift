@@ -28,6 +28,23 @@ extension Bool: SingleValueDiffable {}
 
 extension URL: SingleValueDiffable {}
 
+extension Double: Diffable {
+  func diff(_ other: Double) -> DiffResult {
+    if Int(self * 1_000_000) == Int(other * 1_000_000) {
+      return .same
+    } else {
+      return .different(
+        .singleValue(
+          SingleValueDiff(
+            left: "\(self)",
+            right: "\(other)",
+          )
+        )
+      )
+    }
+  }
+}
+
 extension Date: Diffable {
   func diff(_ other: Self) -> DiffResult {
     if DateHelper.secondsEquals(self, other) {

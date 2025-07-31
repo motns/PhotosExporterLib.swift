@@ -18,10 +18,10 @@ import Foundation
 import Photos
 import Logging
 
+// swiftlint:disable file_length
 // swiftlint:disable:next type_body_length
-public struct PhotosExporterLib {
+public struct PhotosExporterLib: Sendable {
   public let exportBaseDir: URL
-  public let runStatus: Status
 
   private let photokit: PhotokitProtocol
   private let exporterDB: ExporterDB
@@ -34,16 +34,18 @@ public struct PhotosExporterLib {
   private let fileExporter: FileExporter
   private let symlinkCreator: SymlinkCreator
 
-  public struct Result: Codable, Sendable, Equatable {
+  public struct Result: Codable, Sendable, Equatable, Timeable {
     public let assetExport: AssetExporterResult
     public let collectionExport: CollectionExporterResult
     public let fileExport: FileExporterResult
+    public let runTime: Double
 
     public static func empty() -> Result {
       return Result(
         assetExport: AssetExporterResult.empty(),
         collectionExport: CollectionExporterResult.empty(),
-        fileExport: FileExporterResult.empty()
+        fileExport: FileExporterResult.empty(),
+        runTime: 0,
       )
     }
   }
@@ -55,90 +57,67 @@ public struct PhotosExporterLib {
     case unexpectedError(String)
   }
 
-  public enum RunState: Equatable {
-    case notStarted, skipped, running
-    case complete(Double)
-    case failed(String)
-  }
-
-  @Observable
-  public class RunStatus {
-    public var currentState: RunState {
-      currentStateInternal
-    }
-    internal var currentStateInternal: RunState
-
-    public init() {
-      self.currentStateInternal = .notStarted
-    }
-
-    internal func start() {
-      self.currentStateInternal = .running
-    }
-
-    internal func skipped() {
-      self.currentStateInternal = .skipped
-    }
-
-    internal func complete(runTime: Double) {
-      self.currentStateInternal = .complete(runTime)
-    }
-
-    internal func failed(error: String) {
-      self.currentStateInternal = .failed(error)
-    }
-  }
-
-  @Observable
-  public class RunStatusWithProgress: RunStatus {
-    public private(set) var progress: Double = 0
-    private var toProcess: Int = 0
-    private var processed: Int = 0
-
-    internal func startProgress(toProcess: Int) {
-      self.toProcess = toProcess
-    }
-
-    override internal func complete(runTime: Double) {
-      self.progress = 1
-      super.complete(runTime: runTime)
-    }
-
-    override internal func failed(error: String) {
-      reset()
-      super.failed(error: error)
-    }
-
-    func reset() {
-      self.progress = 0
-      self.processed = 0
-      self.toProcess = 0
-    }
-
-    func processed(count: Int = 1) {
-      self.processed += count
-      self.progress = Double(processed) / Double(toProcess)
-    }
-  }
-
-  @Observable
-  public class Status: RunStatus {
+  public struct Status: Sendable {
+    public let status: TaskStatus<Result>
     public let assetExporterStatus: AssetExporterStatus
-    public let collectionExporterStatus: CollectionExporterStatus
+    public let collectionExporterStatus: TaskStatus<CollectionExporterResult>
     public let fileExporterStatus: FileExporterStatus
-    public let symlinkCreatorStatus: SymlinkCreatorStatus
+    public let symlinkCreatorStatus: TaskStatus<EmptyTaskSuccess>
 
-    public init(
-      assetExporterStatus: AssetExporterStatus,
-      collectionExporterStatus: CollectionExporterStatus,
-      fileExporterStatus: FileExporterStatus,
-      symlinkCreatorStatus: SymlinkCreatorStatus,
-    ) {
-      self.assetExporterStatus = assetExporterStatus
-      self.collectionExporterStatus = collectionExporterStatus
-      self.fileExporterStatus = fileExporterStatus
-      self.symlinkCreatorStatus = symlinkCreatorStatus
-      super.init()
+    static func notStarted() -> Status {
+      return Status(
+        status: .notStarted,
+        assetExporterStatus: AssetExporterStatus.notStarted(),
+        collectionExporterStatus: .notStarted,
+        fileExporterStatus: FileExporterStatus.notStarted(),
+        symlinkCreatorStatus: .notStarted
+      )
+    }
+
+    func copy(
+      status: TaskStatus<Result>? = nil,
+      assetExporterStatus: AssetExporterStatus? = nil,
+      collectionExporterStatus: TaskStatus<CollectionExporterResult>? = nil,
+      fileExporterStatus: FileExporterStatus? = nil,
+      symlinkCreatorStatus: TaskStatus<EmptyTaskSuccess>? = nil,
+    ) -> Status {
+      return Status(
+        status: status ?? self.status,
+        assetExporterStatus: assetExporterStatus ?? self.assetExporterStatus,
+        collectionExporterStatus: collectionExporterStatus ?? self.collectionExporterStatus,
+        fileExporterStatus: fileExporterStatus ?? self.fileExporterStatus,
+        symlinkCreatorStatus: symlinkCreatorStatus ?? self.symlinkCreatorStatus,
+      )
+    }
+
+    func withMainStatus(_ newStatus: TaskStatus<Result>) -> Status {
+      return copy(
+        status: newStatus,
+      )
+    }
+
+    func withAssetExporterStatus(_ newStatus: AssetExporterStatus) -> Status {
+      return copy(
+        assetExporterStatus: newStatus,
+      )
+    }
+
+    func withCollectionExporterStatus(_ newStatus: TaskStatus<CollectionExporterResult>) -> Status {
+      return copy(
+        collectionExporterStatus: newStatus,
+      )
+    }
+
+    func withFileExporterStatus(_ newStatus: FileExporterStatus) -> Status {
+      return copy(
+        fileExporterStatus: newStatus,
+      )
+    }
+
+    func withSymlinkCreatorStatus(_ newStatus: TaskStatus<EmptyTaskSuccess>) -> Status {
+      return copy(
+        symlinkCreatorStatus: newStatus,
+      )
     }
   }
 
@@ -201,13 +180,6 @@ public struct PhotosExporterLib {
       timeProvider: timeProvider,
       logger: logger,
     )
-
-    self.runStatus = Status(
-      assetExporterStatus: self.assetExporter.runStatus,
-      collectionExporterStatus: self.collectionExporter.runStatus,
-      fileExporterStatus: self.fileExporter.runStatus,
-      symlinkCreatorStatus: self.symlinkCreator.runStatus,
-    )
   }
 
   public static func create(
@@ -215,12 +187,12 @@ public struct PhotosExporterLib {
     logger: Logger? = nil,
     expiryDays: Int = 30,
     scoreThreshold: Int64 = 850000000,
-  ) throws -> PhotosExporterLib {
+  ) async throws -> PhotosExporterLib {
     let classLogger = ClassLogger(className: "PhotosExporterLib", logger: logger)
 
     do {
       classLogger.info("Creating export folder...")
-      if try ExporterFileManager.shared.createDirectory(url: exportBaseDir) == .exists {
+      if try await ExporterFileManager.shared.createDirectory(url: exportBaseDir) == .exists {
         classLogger.trace("Export folder already exists")
       } else {
         classLogger.trace("Export folder created")
@@ -311,57 +283,181 @@ public struct PhotosExporterLib {
     }
   }
 
+  // swiftlint:disable:next cyclomatic_complexity function_body_length
   public func export(
     assetExportEnabled: Bool = true,
     collectionExportEnabled: Bool = true,
-    fileManagerEnabled: Bool = true,
+    fileExporterEnabled: Bool = true,
     symlinkCreatorEnabled: Bool = true,
-  ) async throws -> Result {
-    do {
-      logger.info("Running Export...")
-      runStatus.start()
-      let startDate = timeProvider.getDate()
+  ) -> AsyncThrowingStream<
+  Status,
+  Swift.Error
+  > {
+    AsyncThrowingStream(
+      bufferingPolicy: .bufferingNewest(10)
+    ) { continuation in
+      Task {
+        var status: Status = Status.notStarted()
+        let startTime = await timeProvider.getDate()
 
-      let exportAssetResult = try await assetExporter.export(isEnabled: assetExportEnabled)
-      let albumExportResult = try collectionExporter.export(isEnabled: collectionExportEnabled)
-      let fileManagerResult = try await fileExporter.run(isEnabled: fileManagerEnabled)
-      try symlinkCreator.create(isEnabled: symlinkCreatorEnabled)
+        do {
+          logger.info("Running Export...")
+          status = status.withMainStatus(.running(nil))
+          continuation.yield(status)
 
-      let exportResult = Result(
-        assetExport: exportAssetResult.copy(
-          fileMarkedForDeletion: exportAssetResult.fileMarkedForDeletion + fileManagerResult.fileMarkedForDeletion
-        ),
-        collectionExport: albumExportResult,
-        fileExport: fileManagerResult.result,
-      )
+          guard !Task.isCancelled else {
+            logger.warning("Export Task cancelled")
+            continuation.yield(status.withMainStatus(.cancelled))
+            continuation.finish()
+            return
+          }
 
-      logger.debug("Writing Export Result History entry to DB...")
-      let assetCount = try exporterDB.countAssets()
-      let fileCount = try exporterDB.countFiles()
-      let albumCount = try exporterDB.countAlbums()
-      let folderCount = try exporterDB.countFolders()
-      let fileSizeTotal = try exporterDB.sumFileSizes()
+          var assetExporterResult: AssetExporterResult = AssetExporterResult.empty()
+          for try await assetExporterStatus in assetExporter.export(isEnabled: assetExportEnabled) {
+            switch assetExporterStatus.status {
+            case .notStarted, .skipped, .cancelled: break
+            case .running:
+              status = status.withAssetExporterStatus(assetExporterStatus)
+              continuation.yield(status)
+            case .failed(let error):
+              status = status
+                .withMainStatus(.failed(error))
+                .withAssetExporterStatus(assetExporterStatus)
+              continuation.yield(status)
+              continuation.finish(throwing: Error.unexpectedError("\(error)"))
+              return
+            case .complete(let result):
+              assetExporterResult = result
+              status = status.withAssetExporterStatus(assetExporterStatus)
+              continuation.yield(status)
+            }
+          }
 
-      let runTime = timeProvider.secondsPassedSince(startDate)
-      let historyEntry = ExportResultHistoryEntry(
-        id: UUID().uuidString,
-        createdAt: timeProvider.getDate(),
-        exportResult: exportResult,
-        assetCount: assetCount,
-        fileCount: fileCount,
-        albumCount: albumCount,
-        folderCount: folderCount,
-        fileSizeTotal: fileSizeTotal ?? 0,
-        runTime: Decimal(runTime),
-      )
-      _ = try exporterDB.insertExportResultHistoryEntry(entry: historyEntry)
+          guard !Task.isCancelled else {
+            logger.warning("Export Task cancelled")
+            continuation.yield(status.withMainStatus(.cancelled))
+            continuation.finish()
+            return
+          }
 
-      logger.info("Export complete in \(runTime)s")
-      runStatus.complete(runTime: runTime)
-      return exportResult
-    } catch {
-      runStatus.failed(error: "\(error)")
-      throw Error.unexpectedError("\(error)")
+          var collectionExporterResult: CollectionExporterResult = CollectionExporterResult.empty()
+          for try await collectionExportStatus in collectionExporter.export(isEnabled: collectionExportEnabled) {
+            switch collectionExportStatus {
+            case .notStarted, .skipped, .cancelled: break
+            case .running:
+              status = status.withCollectionExporterStatus(collectionExportStatus)
+              continuation.yield(status)
+            case .failed(let error):
+              status = status
+                .withMainStatus(.failed(error))
+                .withCollectionExporterStatus(collectionExportStatus)
+              continuation.yield(status)
+              continuation.finish(throwing: Error.unexpectedError("\(error)"))
+              return
+            case .complete(let result):
+              collectionExporterResult = result
+              status = status.withCollectionExporterStatus(collectionExportStatus)
+              continuation.yield(status)
+            }
+          }
+
+          guard !Task.isCancelled else {
+            logger.warning("Export Task cancelled")
+            continuation.yield(status.withMainStatus(.cancelled))
+            continuation.finish()
+            return
+          }
+
+          var fileExporterResult: FileExporterResultWithRemoved = FileExporterResultWithRemoved.empty()
+          for try await fileExporterStatus in fileExporter.run(isEnabled: fileExporterEnabled) {
+            switch fileExporterStatus.status {
+            case .notStarted, .skipped, .cancelled: break
+            case .running:
+              status = status.withFileExporterStatus(fileExporterStatus)
+              continuation.yield(status)
+            case .failed(let error):
+              status = status
+                .withMainStatus(.failed(error))
+                .withFileExporterStatus(fileExporterStatus)
+              continuation.yield(status)
+              continuation.finish(throwing: Error.unexpectedError("\(error)"))
+              return
+            case .complete(let result):
+              fileExporterResult = result
+              status = status.withFileExporterStatus(fileExporterStatus)
+              continuation.yield(status)
+            }
+          }
+
+          guard !Task.isCancelled else {
+            logger.warning("Export Task cancelled")
+            continuation.yield(status.withMainStatus(.cancelled))
+            continuation.finish()
+            return
+          }
+
+          for try await symlinkCreatorStatus in symlinkCreator.create(isEnabled: symlinkCreatorEnabled) {
+            switch symlinkCreatorStatus {
+            case .notStarted, .skipped, .cancelled: break
+            case .running:
+              status = status.withSymlinkCreatorStatus(symlinkCreatorStatus)
+              continuation.yield(status)
+            case .failed(let error):
+              status = status
+                .withMainStatus(.failed(error))
+                .withSymlinkCreatorStatus(symlinkCreatorStatus)
+              continuation.yield(status)
+              continuation.finish(throwing: Error.unexpectedError("\(error)"))
+              return
+            case .complete:
+              status = status.withSymlinkCreatorStatus(symlinkCreatorStatus)
+              continuation.yield(status)
+            }
+          }
+
+          let runTime = await timeProvider.secondsPassedSince(startTime)
+          let exportResult = Result(
+            assetExport: assetExporterResult.copy(
+              fileMarkedForDeletion:
+                assetExporterResult.fileMarkedForDeletion
+                + fileExporterResult.fileMarkedForDeletion
+            ),
+            collectionExport: collectionExporterResult,
+            fileExport: fileExporterResult.result,
+            runTime: runTime,
+          )
+
+          logger.debug("Writing Export Result History entry to DB...")
+          let assetCount = try exporterDB.countAssets()
+          let fileCount = try exporterDB.countFiles()
+          let albumCount = try exporterDB.countAlbums()
+          let folderCount = try exporterDB.countFolders()
+          let fileSizeTotal = try exporterDB.sumFileSizes()
+
+          let historyEntry = ExportResultHistoryEntry(
+            id: UUID().uuidString,
+            createdAt: await timeProvider.getDate(),
+            exportResult: exportResult,
+            assetCount: assetCount,
+            fileCount: fileCount,
+            albumCount: albumCount,
+            folderCount: folderCount,
+            fileSizeTotal: fileSizeTotal ?? 0,
+            runTime: Decimal(runTime),
+          )
+          _ = try exporterDB.insertExportResultHistoryEntry(entry: historyEntry)
+
+          logger.info("Export complete in \(runTime)s")
+          status = status.withMainStatus(.complete(exportResult))
+          continuation.yield(status)
+          continuation.finish()
+        } catch {
+          continuation.yield(
+            status.withMainStatus(.failed("\(error)"))
+          )
+          continuation.finish(throwing: Error.unexpectedError("\(error)"))
+        }
+      }
     }
   }
 }

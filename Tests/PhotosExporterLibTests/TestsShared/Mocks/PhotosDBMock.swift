@@ -16,9 +16,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 @testable import PhotosExporterLib
 
-class PhotosDBMock: PhotosDBProtocol {
-  var assetLocations: [String: PhotosDB.PostalAddress]
-  var assetScores: [String: Int64]
+actor PhotosDBMock: PhotosDBProtocol {
+  public private(set) var assetLocations: [String: PhotosDB.PostalAddress]
+  public private(set) var assetScores: [String: Int64]
 
   init() {
     self.assetLocations = [:]
@@ -31,5 +31,13 @@ class PhotosDBMock: PhotosDBProtocol {
 
   func getAllAssetLocationsById() throws -> [String: PhotosDB.PostalAddress] {
     return assetLocations
+  }
+
+  func setAssetLocations(_ assetLocations: [String: PhotosDB.PostalAddress]) {
+    self.assetLocations = assetLocations
+  }
+
+  func setAssetScores(_ assetScores: [String: Int64]) {
+    self.assetScores = assetScores
   }
 }
