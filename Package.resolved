@@ -1,5 +1,5 @@
 {
-  "originHash" : "3f6cac4da7cccaa00102e225fc253125f95b5bda02eec5284424f1f3a2f01616",
+  "originHash" : "06a9ab2a234bd7f60f94f3f1a6973544270ffa6a939bb1c96a58cc31a49907e2",
   "pins" : [
     {
       "identity" : "grdb.swift",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "3d8596ed08bd13520157f0355e35caed215ffbfa",
-        "version" : "1.6.3"
+        "revision" : "ce592ae52f982c847a4efc0dd881cc9eb32d29f2",
+        "version" : "1.6.4"
       }
     },
     {
