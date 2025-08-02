@@ -21,6 +21,9 @@ public protocol Timeable {
 
 public struct EmptyTaskSuccess: Timeable, Sendable {
   public let runTime: Double
+  public init(runTime: Double) {
+    self.runTime = runTime
+  }
 }
 
 public struct TaskProgress: Sendable {
@@ -28,17 +31,16 @@ public struct TaskProgress: Sendable {
   public let processed: Int
   public let progress: Double
 
-  init(
+  public init(
     toProcess: Int,
     processed: Int,
-    progress: Double,
   ) {
     self.toProcess = toProcess
     self.processed = processed
-    self.progress = progress
+    self.progress = toProcess == 0 ? 0 : Double(processed) / Double(toProcess)
   }
 
-  init(toProcess: Int) {
+  public init(toProcess: Int) {
     self.toProcess = toProcess
     self.processed = 0
     self.progress = 0
@@ -48,7 +50,6 @@ public struct TaskProgress: Sendable {
     return TaskProgress(
       toProcess: toProcess,
       processed: processed + count,
-      progress: toProcess == 0 ? 0 : Double(processed + count) / Double(toProcess)
     )
   }
 }

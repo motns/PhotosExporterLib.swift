@@ -623,7 +623,19 @@ public struct AssetExporterStatus: Sendable {
   public let markDeletedStatus: TaskStatus<AssetMarkedDeletedResult>
   public let removeExpiredStatus: TaskStatus<RemoveExpiredAssetResult>
 
-  static func notStarted() -> AssetExporterStatus {
+  public init(
+    status: TaskStatus<AssetExporterResult>,
+    exportAssetStatus: TaskStatus<AssetExporterResult>,
+    markDeletedStatus: TaskStatus<AssetMarkedDeletedResult>,
+    removeExpiredStatus: TaskStatus<RemoveExpiredAssetResult>,
+  ) {
+    self.status = status
+    self.exportAssetStatus = exportAssetStatus
+    self.markDeletedStatus = markDeletedStatus
+    self.removeExpiredStatus = removeExpiredStatus
+  }
+
+  public static func notStarted() -> AssetExporterStatus {
     return AssetExporterStatus(
       status: .notStarted,
       exportAssetStatus: .notStarted,

@@ -411,7 +411,17 @@ public struct FileExporterStatus: Sendable {
   public let copyStatus: TaskStatus<CopyFileResult>
   public let deleteStatus: TaskStatus<DeleteFileResult>
 
-  static func notStarted() -> FileExporterStatus {
+  public init(
+    status: TaskStatus<FileExporterResultWithRemoved>,
+    copyStatus: TaskStatus<CopyFileResult>,
+    deleteStatus: TaskStatus<DeleteFileResult>,
+  ) {
+    self.status = status
+    self.copyStatus = copyStatus
+    self.deleteStatus = deleteStatus
+  }
+
+  public static func notStarted() -> FileExporterStatus {
     return FileExporterStatus(
       status: .notStarted,
       copyStatus: .notStarted,

@@ -64,7 +64,21 @@ public struct PhotosExporterLib: Sendable {
     public let fileExporterStatus: FileExporterStatus
     public let symlinkCreatorStatus: TaskStatus<EmptyTaskSuccess>
 
-    static func notStarted() -> Status {
+    public init(
+      status: TaskStatus<Result>,
+      assetExporterStatus: AssetExporterStatus,
+      collectionExporterStatus: TaskStatus<CollectionExporterResult>,
+      fileExporterStatus: FileExporterStatus,
+      symlinkCreatorStatus: TaskStatus<EmptyTaskSuccess>,
+    ) {
+      self.status = status
+      self.assetExporterStatus = assetExporterStatus
+      self.collectionExporterStatus = collectionExporterStatus
+      self.fileExporterStatus = fileExporterStatus
+      self.symlinkCreatorStatus = symlinkCreatorStatus
+    }
+
+    public static func notStarted() -> Status {
       return Status(
         status: .notStarted,
         assetExporterStatus: AssetExporterStatus.notStarted(),
