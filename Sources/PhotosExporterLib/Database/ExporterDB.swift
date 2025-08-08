@@ -362,6 +362,18 @@ extension ExporterDB {
     }
   }
 
+  func getFolderIdSet() throws -> Set<String> {
+    return try dbQueue.read { db in
+      try String.fetchSet(
+        db,
+        sql: """
+        SELECT id
+        FROM album_folder
+        """,
+      )
+    }
+  }
+
   func countFolders() throws -> Int {
     return try dbQueue.read { db in
       try ExportedFolder.fetchCount(db)
@@ -407,6 +419,18 @@ extension ExporterDB {
   func getAllAlbums() throws -> [ExportedAlbum] {
     return try dbQueue.read { db in
       try ExportedAlbum.fetchAll(db)
+    }
+  }
+
+  func getAlbumIdSet() throws -> Set<String> {
+    return try dbQueue.read { db in
+      try String.fetchSet(
+        db,
+        sql: """
+        SELECT id
+        FROM album
+        """,
+      )
     }
   }
 
@@ -581,6 +605,15 @@ extension ExporterDB {
     }
   }
 
+  func deleteFolder(folderId: String) throws -> Bool {
+    logger.debug("Deleting Folder with ID...", [
+      "id": "\(folderId)",
+    ])
+    return try dbQueue.write { db in
+      try ExportedFolder.deleteOne(db, id: folderId)
+    }
+  }
+
   func upsertAlbum(album: ExportedAlbum) throws -> UpsertResult {
     let loggerMetadata: Logger.Metadata = [
       "id": "\(album.id)",
@@ -612,6 +645,15 @@ extension ExporterDB {
         logger.trace("New Album inserted", loggerMetadata)
         return UpsertResult.insert
       }
+    }
+  }
+
+  func deleteAlbum(albumId: String) throws -> Bool {
+    logger.debug("Deleting Album with ID...", [
+      "id": "\(albumId)",
+    ])
+    return try dbQueue.write { db in
+      try ExportedAlbum.deleteOne(db, id: albumId)
     }
   }
 

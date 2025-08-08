@@ -67,11 +67,25 @@ struct CollectionExporter {
           logger.info("Exporting Folders and Albums to local DB...")
           let startDate = await timeProvider.getDate()
 
-          let res = try await exportFoldersAndAlbums()
+          let exportRes = try await exportFoldersAndAlbums()
+
+          guard !Task.isCancelled else {
+            logger.warning("Collection Exporter Task cancelled")
+            continuation.yield(.cancelled)
+            continuation.finish()
+            return
+          }
+
+          let removeRes = try await removeDeletedFoldersAndAlbums()
 
           let runTime = await timeProvider.secondsPassedSince(startDate)
           logger.info("Folder and Album export complete in \(runTime)s")
-          continuation.yield(.complete(res))
+          continuation.yield(.complete(
+            exportRes.copy(
+              folderDeleted: removeRes.folderDeleted,
+              albumDeleted: removeRes.albumDeleted,
+            )
+          ))
           continuation.finish()
         } catch {
           continuation.yield(.failed("\(error)"))
@@ -92,8 +106,7 @@ struct CollectionExporter {
     var albumUnchangedCnt = 0
 
     logger.debug("Processing shared Albums...")
-    let sharedAlbums = try await self.photokit.getSharedAlbums()
-    for sharedAlbum in sharedAlbums {
+    for sharedAlbum in try await self.photokit.getSharedAlbums() {
       let albumUpsertRes = try self.exporterDB.upsertAlbum(
         album: ExportedAlbum.fromPhotokitAlbum(
           album: sharedAlbum,
@@ -156,8 +169,8 @@ struct CollectionExporter {
       case .nochange: albumUnchangedCnt += 1
       }
     }
-    runTime = await timeProvider.secondsPassedSince(startTime)
 
+    runTime = await timeProvider.secondsPassedSince(startTime)
     for subfolder in folder.subfolders {
       let subfolderRes = try await processPhotokitFolder(folder: subfolder, parentId: folder.id)
       folderInsertedCnt += subfolderRes.folderInserted
@@ -173,13 +186,90 @@ struct CollectionExporter {
       folderInserted: folderInsertedCnt,
       folderUpdated: folderUpdatedCnt,
       folderUnchanged: folderUnchangedCnt,
-      folderDeleted: 0, // TODO
+      folderDeleted: 0,
       albumInserted: albumInsertedCnt,
       albumUpdated: albumUpdatedCnt,
       albumUnchanged: albumUnchangedCnt,
-      albumDeleted: 0, // TODO
+      albumDeleted: 0,
       runTime: runTime,
     )
+  }
+
+  private func removeDeletedFoldersAndAlbums() async throws -> CollectionExporterResult {
+    logger.debug("Removing deleted Albums")
+
+    let photosAlbumIds = try await getAllPhotosAlbumIds()
+    let exportedAlbumIds = try self.exporterDB.getAlbumIdSet()
+    let removedAlbumIds = exportedAlbumIds.subtracting(photosAlbumIds)
+
+    if removedAlbumIds.isEmpty {
+      logger.debug("No Album IDs to remove")
+    } else {
+      logger.debug("Found \(removedAlbumIds.count) Album IDs to remove")
+    }
+
+    for albumId in removedAlbumIds {
+      logger.debug("Removing Album with ID...", [
+        "id": "\(albumId)",
+      ])
+      _ = try self.exporterDB.deleteAlbum(albumId: albumId)
+    }
+
+    let photosFolderIds = try await getAllPhotosFolderIds()
+    let exportedFolderIds = try self.exporterDB.getFolderIdSet()
+    let removedFolderIds = exportedFolderIds.subtracting(photosFolderIds)
+
+    if removedFolderIds.isEmpty {
+      logger.debug("No Folder IDs to remove")
+    } else {
+      logger.debug("Found \(removedFolderIds.count) Folder IDs to remove")
+    }
+
+    for folderId in removedFolderIds {
+      logger.debug("Removing Folder with ID...", [
+        "id": "\(folderId)",
+      ])
+      _ = try self.exporterDB.deleteFolder(folderId: folderId)
+    }
+
+    return CollectionExporterResult.empty().copy(
+      folderDeleted: removedFolderIds.count,
+      albumDeleted: removedAlbumIds.count,
+    )
+  }
+
+  private func getAllPhotosAlbumIds() async throws -> Set<String> {
+    var albumIds = getFolderAlbumIds(
+      folder: try await self.photokit.getRootFolder()
+    )
+
+    for sharedAlbum in try await self.photokit.getSharedAlbums() {
+      albumIds.insert(sharedAlbum.id)
+    }
+
+    return albumIds
+  }
+
+  private func getFolderAlbumIds(folder: PhotokitFolder) -> Set<String> {
+    var albumIds = Set(folder.albums.map { album in album.id })
+    for subfolder in folder.subfolders {
+      albumIds = albumIds.union(getFolderAlbumIds(folder: subfolder))
+    }
+    return albumIds
+  }
+
+  private func getAllPhotosFolderIds() async throws -> Set<String> {
+    return getFolderSubfolderIds(
+      folder: try await self.photokit.getRootFolder()
+    )
+  }
+
+  private func getFolderSubfolderIds(folder: PhotokitFolder) -> Set<String> {
+    var folderIds = Set([folder.id])
+    for subfolder in folder.subfolders {
+      folderIds = folderIds.union(getFolderSubfolderIds(folder: subfolder))
+    }
+    return folderIds
   }
 }
 

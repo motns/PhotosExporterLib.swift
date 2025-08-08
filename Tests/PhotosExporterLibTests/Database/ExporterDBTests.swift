@@ -163,6 +163,18 @@ final class ExporterDBTests {
     #expect(res == expected)
   }
 
+  @Test("Get Album ID set")
+  func getAlbumIdSet() throws {
+    let folder = try dataGen.createAndSaveExportedFolder()
+    let album1 = try dataGen.createAndSaveExportedAlbum(albumFolderId: folder.id)
+    let album2 = try dataGen.createAndSaveExportedAlbum(albumFolderId: folder.id)
+    let album3 = try dataGen.createAndSaveExportedAlbum(albumFolderId: folder.id)
+
+    let expected = Set([album1.id, album2.id, album3.id])
+    let result = try exporterDB.getAlbumIdSet()
+    #expect(result == expected)
+  }
+
   @Test("Get orphaned Files")
   func getOrphanedFiles() throws {
     _ = try dataGen.createAndSaveLinkedFile()
@@ -412,6 +424,17 @@ final class ExporterDBTests {
     #expect(res == expected)
   }
 
+  @Test("Get Folder ID set")
+  func getFolderIdSet() throws {
+    let folder1 = try dataGen.createAndSaveExportedFolder()
+    let folder2 = try dataGen.createAndSaveExportedFolder()
+    let folder3 = try dataGen.createAndSaveExportedFolder()
+
+    let expected = Set([folder1.id, folder2.id, folder3.id])
+    let result = try exporterDB.getFolderIdSet()
+    #expect(result == expected)
+  }
+
   // - MARK: Updates
 
   @Test("Upsert Asset - New")
@@ -651,6 +674,16 @@ final class ExporterDBTests {
     #expect(folderToCheck == updatedFolder)
   }
 
+  @Test("Delete Folder")
+  func deleteFolder() throws {
+    let newFolder = try dataGen.createAndSaveExportedFolder()
+    let deleteRes = try self.exporterDB.deleteFolder(folderId: newFolder.id)
+    #expect(deleteRes == true)
+
+    let folderToCheck = try self.exporterDB.getFolder(id: newFolder.id)
+    #expect(folderToCheck == nil)
+  }
+
   @Test("Upsert Album - New")
   func upsertAlbumNew() throws {
     let newFolder = ExportedFolder(
@@ -712,6 +745,17 @@ final class ExporterDBTests {
 
     let albumToCheck = try self.exporterDB.getAlbum(id: newAlbum.id)
     #expect(albumToCheck == updatedAlbum)
+  }
+
+  @Test("Delete Album")
+  func deleteAlbum() throws {
+    let newFolder = try dataGen.createAndSaveExportedFolder()
+    let newAlbum = try dataGen.createAndSaveExportedAlbum(albumFolderId: newFolder.id)
+    let deleteRes = try self.exporterDB.deleteAlbum(albumId: newAlbum.id)
+    #expect(deleteRes == true)
+
+    let albumToCheck = try self.exporterDB.getAlbum(id: newAlbum.id)
+    #expect(albumToCheck == nil)
   }
 
   @Test("Mark Asset as Deleted")

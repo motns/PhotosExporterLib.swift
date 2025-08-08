@@ -1317,4 +1317,102 @@ final class PhotosExporterLibTests {
       "\(Diff.getDiff(sortedFilteredRemoveCalls2, expectedRemoveCalls2).prettyDescription)"
     )
   }
+
+  // - MARK: Delete removed Albums and Folders
+  @Test("Delete removed Albums and Folders")
+  // swiftlint:disable:next function_body_length
+  func deleteRemovedAlbumsAndFolders() async throws {
+    let albumToKeep = dataGen.createPhotokitAlbum()
+    let albumToRemove = dataGen.createPhotokitAlbum()
+    let subfolderAlbumToKeep = dataGen.createPhotokitAlbum()
+    let subfolderAlbumToRemove = dataGen.createPhotokitAlbum()
+
+    var subfolderToKeep = dataGen.createPhotokitFolder(
+      albums: [
+        subfolderAlbumToKeep,
+        subfolderAlbumToRemove,
+      ]
+    )
+    let subfolderToRemove = dataGen.createPhotokitFolder()
+
+    await photokitMock.setRootAlbums([albumToKeep, albumToRemove])
+    await photokitMock.setRootFolders([subfolderToKeep, subfolderToRemove])
+    await photokitMock.setAlbums([
+      albumToKeep,
+      albumToRemove,
+      subfolderAlbumToKeep,
+      subfolderAlbumToRemove,
+    ])
+
+    let initialRes = try await photosExporterLib.export()
+
+    let expectedInitialRes = PhotosExporterLib.Result(
+      assetExport: AssetExporterResult.empty().copy(
+        runTime: initialRes.assetExport.runTime,
+      ),
+      collectionExport: CollectionExporterResult.empty().copy(
+        folderInserted: 3,
+        albumInserted: 4,
+        runTime: initialRes.collectionExport.runTime,
+      ),
+      fileExport: FileExporterResult.empty().copy(
+        runTime: initialRes.fileExport.runTime,
+      ),
+      runTime: initialRes.runTime
+    )
+
+    #expect(
+      initialRes == expectedInitialRes,
+      "\(initialRes.diff(expectedInitialRes).prettyDescription)"
+    )
+
+    subfolderToKeep = subfolderToKeep.copy(
+      albums: [subfolderAlbumToKeep]
+    )
+
+    await photokitMock.setRootAlbums([albumToKeep])
+    await photokitMock.setRootFolders([subfolderToKeep])
+    await photokitMock.setAlbums([
+      albumToKeep,
+      subfolderAlbumToKeep,
+    ])
+
+    let removeRes = try await photosExporterLib.export()
+
+    let expectedRemoveRes = PhotosExporterLib.Result(
+      assetExport: AssetExporterResult.empty().copy(
+        runTime: removeRes.assetExport.runTime,
+      ),
+      collectionExport: CollectionExporterResult.empty().copy(
+        folderUnchanged: 2,
+        folderDeleted: 1,
+        albumUnchanged: 2,
+        albumDeleted: 2,
+        runTime: removeRes.collectionExport.runTime,
+      ),
+      fileExport: FileExporterResult.empty().copy(
+        runTime: removeRes.fileExport.runTime,
+      ),
+      runTime: removeRes.runTime
+    )
+
+    #expect(
+      removeRes == expectedRemoveRes,
+      "\(removeRes.diff(expectedRemoveRes).prettyDescription)"
+    )
+
+    let expectedAlbumIds = Set([
+      albumToKeep.id,
+      subfolderAlbumToKeep.id,
+    ])
+    let exportedAlbumIds = try exporterDB.getAlbumIdSet()
+    #expect(expectedAlbumIds == exportedAlbumIds)
+
+    let expectedFolderIds = Set([
+      Photokit.RootFolderId,
+      subfolderToKeep.id,
+    ])
+    let exportedFolderIds = try exporterDB.getFolderIdSet()
+    #expect(expectedFolderIds == exportedFolderIds)
+  }
 }

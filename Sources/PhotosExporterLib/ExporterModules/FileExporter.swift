@@ -353,6 +353,18 @@ public struct FileExporterResult: Codable, Sendable, Equatable, Timeable {
       runTime: 0,
     )
   }
+
+  func copy(
+    copied: Int? = nil,
+    deleted: Int? = nil,
+    runTime: Double? = nil,
+  ) -> FileExporterResult {
+    return FileExporterResult(
+      copied: copied ?? self.copied,
+      deleted: deleted ?? self.deleted,
+      runTime: runTime ?? self.runTime,
+    )
+  }
 }
 
 public struct FileExporterResultWithRemoved: Sendable, Timeable {
