@@ -22,29 +22,39 @@ let exporter = try await PhotosExporterLib.create(exportBaseDir: "/tmp/export")
 let result = try await exporter.export()
 print(result)
 /*
-ExportResult(
+PhotosExporterLib.Result(
   assetExport: PhotosExporterLib.AssetExportResult(
     assetInserted: 0,
     assetUpdated: 0,
     assetUnchanged: 0,
     assetSkipped: 0,
+    assetMarkedForDeletion: 0,
+    assetDeleted: 0,
     fileInserted: 0,
     fileUpdated: 0,
     fileUnchanged: 0,
-    fileSkipped: 0
+    fileSkipped: 0,
+    fileMarkedForDeletion: 0,
+    fileDeleted: 0,
+    runTime: 0
   ),
   collectionExport: PhotosExporterLib.CollectionExportResult(
     folderInserted: 0,
     folderUpdated: 0,
     folderUnchanged: 0,
+    folderDeleted: 0,
     albumInserted: 0,
     albumUpdated: 0,
-    albumUnchanged: 0
+    albumUnchanged: 0,
+    albumDeleted: 0,
+    runTime: 0
   ),
-  fileCopy: PhotosExporterLib.FileCopyResult(
+  fileExport: PhotosExporterLib.FileCopyResult(
     copied: 0,
-    removed: 0
-  )
+    deleted: 0,
+    runTime: 0
+  ),
+  runTime: 0
 )
 */
 ```

@@ -38,7 +38,7 @@ final class PhotosExporterLibTests {
   init() async throws {
     var logger = Logger(label: "io.motns.testing")
     logger.logLevel = .critical
-    // logger.logLevel = .trace
+    // logger.logLevel = .debug
     self.testDir = try TestHelpers.createTestDir()
 
     self.photokitMock = PhotokitMock()
@@ -240,7 +240,7 @@ final class PhotosExporterLibTests {
 
     // - MARK: Initial run
     var initialRes = PhotosExporterLib.Result.empty()
-    for try await exporterStatus in photosExporterLib.export() {
+    for try await exporterStatus in photosExporterLib.exportWithProgress() {
       switch exporterStatus.status {
       case .complete(let res):
         initialRes = res
@@ -450,7 +450,7 @@ final class PhotosExporterLibTests {
     _ = await timeProvider.advanceTime(hours: 2)
 
     var noChangeRes = PhotosExporterLib.Result.empty()
-    for try await exporterStatus in photosExporterLib.export() {
+    for try await exporterStatus in photosExporterLib.exportWithProgress() {
       switch exporterStatus.status {
       case .complete(let res):
         noChangeRes = res
@@ -567,7 +567,7 @@ final class PhotosExporterLibTests {
     ].sorted(by: { $0.id < $1.id })
 
     var updateRes = PhotosExporterLib.Result.empty()
-    for try await exporterStatus in photosExporterLib.export() {
+    for try await exporterStatus in photosExporterLib.exportWithProgress() {
       switch exporterStatus.status {
       case .complete(let res):
         updateRes = res
@@ -819,7 +819,7 @@ final class PhotosExporterLibTests {
 
     // - MARK: First run - mark for deletion
     var markRes = PhotosExporterLib.Result.empty()
-    for try await exporterStatus in photosExporterLib.export() {
+    for try await exporterStatus in photosExporterLib.exportWithProgress() {
       switch exporterStatus.status {
       case .complete(let res):
         markRes = res
@@ -907,7 +907,7 @@ final class PhotosExporterLibTests {
     _ = await timeProvider.advanceTime(minutes: 10)
 
     var noChangeRes = PhotosExporterLib.Result.empty()
-    for try await exporterStatus in photosExporterLib.export() {
+    for try await exporterStatus in photosExporterLib.exportWithProgress() {
       switch exporterStatus.status {
       case .complete(let res):
         noChangeRes = res
@@ -977,7 +977,7 @@ final class PhotosExporterLibTests {
     _ = await timeProvider.advanceTime(days: 31)
 
     var deleteRes = PhotosExporterLib.Result.empty()
-    for try await exporterStatus in photosExporterLib.export() {
+    for try await exporterStatus in photosExporterLib.exportWithProgress() {
       switch exporterStatus.status {
       case .complete(let res):
         deleteRes = res
@@ -1121,7 +1121,7 @@ final class PhotosExporterLibTests {
     ])
 
     var markRes2 = PhotosExporterLib.Result.empty()
-    for try await exporterStatus in photosExporterLib.export() {
+    for try await exporterStatus in photosExporterLib.exportWithProgress() {
       switch exporterStatus.status {
       case .complete(let res):
         markRes2 = res
@@ -1192,7 +1192,7 @@ final class PhotosExporterLibTests {
     await fileManagerMock.resetCalls()
 
     var deleteRes2 = PhotosExporterLib.Result.empty()
-    for try await exporterStatus in photosExporterLib.export() {
+    for try await exporterStatus in photosExporterLib.exportWithProgress() {
       switch exporterStatus.status {
       case .complete(let res):
         deleteRes2 = res

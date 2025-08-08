@@ -298,7 +298,7 @@ public struct PhotosExporterLib: Sendable {
   }
 
   // swiftlint:disable:next cyclomatic_complexity function_body_length
-  public func export(
+  public func exportWithProgress(
     assetExportEnabled: Bool = true,
     collectionExportEnabled: Bool = true,
     fileExporterEnabled: Bool = true,
@@ -473,6 +473,29 @@ public struct PhotosExporterLib: Sendable {
         }
       }
     }
+  }
+
+  public func export(
+    assetExportEnabled: Bool = true,
+    collectionExportEnabled: Bool = true,
+    fileExporterEnabled: Bool = true,
+    symlinkCreatorEnabled: Bool = true,
+  ) async throws -> Result {
+    var result = Result.empty()
+
+    for try await status in exportWithProgress(
+      assetExportEnabled: assetExportEnabled,
+      collectionExportEnabled: collectionExportEnabled,
+      fileExporterEnabled: fileExporterEnabled,
+      symlinkCreatorEnabled: symlinkCreatorEnabled,
+    ) {
+      switch status.status {
+      case .complete(let exportResult): result = exportResult
+      default: break
+      }
+    }
+
+    return result
   }
 }
 

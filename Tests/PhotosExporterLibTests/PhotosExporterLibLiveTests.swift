@@ -59,14 +59,7 @@ final class PhotosExporterLibLiveTests {
 
   @Test("Export")
   func export() async throws {
-    var initialRes = PhotosExporterLib.Result.empty()
-    for try await exporterStatus in photosExporterLib.export() {
-      switch exporterStatus.status {
-      case .complete(let res):
-        initialRes = res
-      default: break
-      }
-    }
+    let initialRes = try await photosExporterLib.export()
 
     let expectedInitialRes = PhotosExporterLib.Result(
       assetExport: AssetExporterResult(
