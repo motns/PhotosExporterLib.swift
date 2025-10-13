@@ -43,10 +43,10 @@ jobs:
       env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     - name: Upload Snyk OS result
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: snyk-os.sarif
     - name: Upload Snyk Code result
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: snyk-code.sarif
